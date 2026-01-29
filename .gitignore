@@ -46,3 +46,4 @@ htmlcov/
 
 # ローカル実験用（任意）
 .kiro/local/
+node_modules
