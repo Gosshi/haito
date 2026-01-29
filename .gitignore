@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking / Linting
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# kiro / cc-sdd
+# =========================
+
+# 実行時に生成される spec / draft / state
+.kiro/specs/
+.kiro/generated/
+.kiro/output/
+.kiro/state/
+.kiro/cache/
+
+# 一時ファイル・バックアップ
+.kiro/**/*.tmp
+.kiro/**/*.bak
+.kiro/**/.DS_Store
+
+# ローカル実験用（任意）
+.kiro/local/

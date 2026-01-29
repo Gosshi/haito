@@ -1,0 +1,1 @@
+/Users/gota/dotfiles/kiro/impl-brief.md
