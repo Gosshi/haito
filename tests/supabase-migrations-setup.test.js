@@ -119,11 +119,11 @@ test('create_tables migration adds updated_at triggers', () => {
   assert.match(normalized, /new\.updated_at = now\(\)/);
   assert.match(
     normalized,
-    /create trigger [a-z0-9_]+ on holdings[^;]+execute function public\.set_updated_at\(\)/
+    /create trigger [a-z0-9_]+[^;]+ on holdings[^;]+execute function public\.set_updated_at\(\)/
   );
   assert.match(
     normalized,
-    /create trigger [a-z0-9_]+ on user_settings[^;]+execute function public\.set_updated_at\(\)/
+    /create trigger [a-z0-9_]+[^;]+ on user_settings[^;]+execute function public\.set_updated_at\(\)/
   );
 });
 
