@@ -1,18 +1,24 @@
 {
-  "version": 1,
-  "description": "Kiro spec-init 用の初期化テンプレート（日本語）。このフェーズでは「初期ファイル生成のみ」を行う。",
-  "outputs": [
-    {
-      "path": "requirements.md",
-      "template": "requirements-init.md",
-      "when": "always"
+  "feature_name": "{{FEATURE_NAME}}",
+  "created_at": "{{TIMESTAMP}}",
+  "updated_at": "{{TIMESTAMP}}",
+  "language": "ja",
+  "phase": "initialized",
+  "approvals": {
+    "requirements": {
+      "generated": false,
+      "approved": false
+    },
+    "design": {
+      "generated": false,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
     }
-  ],
-  "policy": {
-    "phase_separation": true,
-    "notes": [
-      "初期化フェーズでは requirements.md のみ生成する",
-      "設計(design)・タスク(tasks)生成は人手レビュー後の次フェーズで実行する"
-    ]
-  }
+  },
+  "ready_for_implementation": false
 }
+
+
