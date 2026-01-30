@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 import { fetchHoldingCodesByUser, fetchDistinctHoldingCodes, upsertDividendData } from '../../../../lib/api/dividends';
 import type {
   DividendApiError,
@@ -17,6 +19,17 @@ const buildError = (type: DividendApiError['type'], message: string): DividendAp
   type,
   message,
 });
+
+const normalizeErrorMessage = (error: DividendApiError): DividendApiError => {
+  if (error.type === 'rate_limited') {
+    return {
+      type: error.type,
+      message: '取得が混雑しています。しばらく待って再試行してください。',
+    };
+  }
+
+  return error;
+};
 
 const isAuthorizedCron = (request: Request): boolean => {
   if (!CRON_SECRET) {
@@ -65,7 +78,11 @@ const runBatch = async (codes: string[]): Promise<DividendBatchResult> => {
 
         const fetchResult = await fetchDividendWithFallback(normalized);
         if (!fetchResult.ok) {
-          return { code: normalized, ok: false, error: fetchResult.error };
+          return {
+            code: normalized,
+            ok: false,
+            error: normalizeErrorMessage(fetchResult.error),
+          };
         }
 
         const upsertResult = await upsertDividendData(fetchResult.data);
@@ -126,8 +143,12 @@ export async function GET(request: Request) {
 
   const fetchResult = await fetchDividendWithFallback(normalized);
   if (!fetchResult.ok) {
-    const response: DividendApiResult = { ok: false, error: fetchResult.error };
-    return NextResponse.json(response, { status: 502 });
+    const response: DividendApiResult = {
+      ok: false,
+      error: normalizeErrorMessage(fetchResult.error),
+    };
+    const status = fetchResult.error.type === 'rate_limited' ? 429 : 502;
+    return NextResponse.json(response, { status });
   }
 
   const upsertResult = await upsertDividendData(fetchResult.data);

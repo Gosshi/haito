@@ -127,11 +127,6 @@ export function AddHoldingForm() {
       return;
     }
 
-    if (lastFetchedCode.current === code) {
-      return;
-    }
-
-    lastFetchedCode.current = code;
     setIsStockNameLoading(true);
     setStockNameError(null);
 
@@ -152,6 +147,7 @@ export function AddHoldingForm() {
           ? data.data.stock_name
           : '';
       setStockName(name);
+      lastFetchedCode.current = code;
     } catch (error) {
       setStockNameError('銘柄名を取得できませんでした。');
     } finally {
@@ -180,6 +176,11 @@ export function AddHoldingForm() {
     const trimmed = stockCode.trim();
     if (!isValidStockCode(trimmed)) {
       setStockNameError(null);
+      lastFetchedCode.current = null;
+      return;
+    }
+
+    if (lastFetchedCode.current === trimmed) {
       return;
     }
 

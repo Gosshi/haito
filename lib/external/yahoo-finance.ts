@@ -1,4 +1,4 @@
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
 
 import type {
   DividendApiError,
@@ -8,6 +8,7 @@ import type {
 } from '../dividends/types';
 
 const STOCK_CODE_REGEX = /^\d{4}$/;
+const yahooFinanceClient = new YahooFinance();
 
 const normalizeStockCode = (code: string): string => {
   const trimmed = code.trim().toUpperCase();
@@ -37,6 +38,19 @@ const normalizeYield = (value: number | null): number | null => {
 
   return value <= 1 ? Number((value * 100).toFixed(4)) : value;
 };
+
+const RATE_LIMIT_PATTERNS: RegExp[] = [
+  /429/,
+  /too\\s+many\\s+requests/i,
+  /failed\\s+to\\s+get\\s+crumb/i,
+  /rate\\s*limit/i,
+];
+
+const isRateLimitError = (message: string): boolean =>
+  RATE_LIMIT_PATTERNS.some((pattern) => pattern.test(message));
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 type YahooDateValue =
   | { raw?: number | string; fmt?: string }
@@ -108,51 +122,69 @@ export class YahooFinanceProvider implements DividendProvider {
   async fetchByCode(code: string): Promise<DividendProviderResult> {
     const symbol = toSymbol(code);
 
-    try {
-      const result = await yahooFinance.quoteSummary(symbol, {
-        modules: ['summaryDetail', 'calendarEvents', 'price'],
-      });
+    const maxAttempts = 3;
+    const baseDelayMs = 500;
 
-      if (!result) {
-        return {
-          ok: false,
-          error: buildError('not_found', 'Symbol not found.'),
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        const result = await yahooFinanceClient.quote(symbol);
+
+        if (!result) {
+          return {
+            ok: false,
+            error: buildError('not_found', 'Symbol not found.'),
+          };
+        }
+
+        const annualDividendRaw =
+          toNumber(result.trailingAnnualDividendRate) ??
+          toNumber(result.dividendRate);
+        const dividendYieldRaw =
+          toNumber(result.dividendYield) ??
+          toNumber(result.trailingAnnualDividendYield);
+        const dividendDate =
+          result.dividendDate instanceof Date ? result.dividendDate : null;
+
+        const snapshot: DividendSnapshot = {
+          stock_code: normalizeStockCode(code),
+          stock_name:
+            (typeof result.shortName === 'string' && result.shortName) ||
+            (typeof result.longName === 'string' && result.longName) ||
+            null,
+          annual_dividend: annualDividendRaw ?? null,
+          dividend_yield: normalizeYield(dividendYieldRaw),
+          ex_dividend_months: null,
+          payment_months: dividendDate
+            ? [dividendDate.getUTCMonth() + 1]
+            : null,
+          last_updated: new Date().toISOString(),
         };
+
+        return { ok: true, data: snapshot };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Upstream fetch failed.';
+        const rateLimited = isRateLimitError(message);
+        const notFound = /not found|no such symbol|symbol/i.test(message);
+
+        if (rateLimited && attempt < maxAttempts - 1) {
+          await sleep(baseDelayMs * 2 ** attempt);
+          continue;
+        }
+
+        const type = notFound
+          ? 'not_found'
+          : rateLimited
+            ? 'rate_limited'
+            : 'upstream_error';
+        return { ok: false, error: buildError(type, message) };
       }
-
-      const summaryDetail = result.summaryDetail ?? null;
-      const calendarEvents = result.calendarEvents ?? null;
-      const price = result.price ?? null;
-
-      const annualDividendRaw =
-        toNumber(summaryDetail?.trailingAnnualDividendRate) ??
-        toNumber(summaryDetail?.dividendRate);
-      const dividendYieldRaw =
-        toNumber(summaryDetail?.dividendYield) ??
-        toNumber(summaryDetail?.trailingAnnualDividendYield);
-
-      const snapshot: DividendSnapshot = {
-        stock_code: normalizeStockCode(code),
-        stock_name:
-          (typeof price?.shortName === 'string' && price.shortName) ||
-          (typeof price?.longName === 'string' && price.longName) ||
-          null,
-        annual_dividend: annualDividendRaw ?? null,
-        dividend_yield: normalizeYield(dividendYieldRaw),
-        ex_dividend_months: extractMonths(calendarEvents?.exDividendDate ?? null),
-        payment_months: extractMonths(calendarEvents?.dividendDate ?? null),
-        last_updated: new Date().toISOString(),
-      };
-
-      return { ok: true, data: snapshot };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Upstream fetch failed.';
-      const type = /not found|no such symbol|symbol/i.test(message)
-        ? 'not_found'
-        : 'upstream_error';
-      return { ok: false, error: buildError(type, message) };
     }
+
+    return {
+      ok: false,
+      error: buildError('rate_limited', 'Upstream rate limited.'),
+    };
   }
 }
 
