@@ -1,4 +1,5 @@
 import { HoldingsTable } from '../../components/portfolio/holdings-table';
+import { Toaster } from '../../components/ui/toaster';
 
 export default function PortfolioPage() {
   return (
@@ -10,6 +11,7 @@ export default function PortfolioPage() {
         </p>
       </div>
       <HoldingsTable />
+      <Toaster />
     </main>
   );
 }

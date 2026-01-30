@@ -15,10 +15,26 @@ import {
   type HoldingsErrorType,
   updateHolding as updateHoldingApi,
 } from '../lib/api/holdings';
+import { pushToast } from './toast-store';
 
 export type HoldingsActionResult =
   | { ok: true }
   | { ok: false; error: string; errorType: HoldingsErrorType };
+
+const resolveAuthToastMessage = (
+  errorType: HoldingsErrorType,
+  message: string
+): string | null => {
+  if (errorType === 'unauthorized') {
+    return '認証が必要です。';
+  }
+
+  if (/permission|row-level security|policy/i.test(message)) {
+    return '権限がありません。';
+  }
+
+  return null;
+};
 
 type HoldingsState = {
   holdings: Holding[];
@@ -88,11 +104,18 @@ export const useHoldingsStore = create<HoldingsState>((set, get) => ({
 
     const updateResult = await updateHoldingApi(input);
     if (!updateResult.ok) {
+      const authToast = resolveAuthToastMessage(
+        updateResult.error.type,
+        updateResult.error.message
+      );
       set({
         holdings: previousHoldings,
         isLoading: false,
         error: updateResult.error.message,
       });
+      if (authToast) {
+        pushToast(authToast, 'error');
+      }
       return {
         ok: false,
         error: updateResult.error.message,
@@ -113,11 +136,18 @@ export const useHoldingsStore = create<HoldingsState>((set, get) => ({
 
     const deleteResult = await deleteHoldingApi(input);
     if (!deleteResult.ok) {
+      const authToast = resolveAuthToastMessage(
+        deleteResult.error.type,
+        deleteResult.error.message
+      );
       set({
         holdings: previousHoldings,
         isLoading: false,
         error: deleteResult.error.message,
       });
+      if (authToast) {
+        pushToast(authToast, 'error');
+      }
       return {
         ok: false,
         error: deleteResult.error.message,

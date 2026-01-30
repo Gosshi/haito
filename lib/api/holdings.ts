@@ -119,8 +119,7 @@ export const updateHolding = async (
   };
 
   const { error } = await supabase
-    .from('holdings')
-    .update(payload)
+    .from('holdings').update(payload)
     .eq('id', input.id)
     .eq('user_id', userIdResult.userId);
 
@@ -155,8 +154,7 @@ export const deleteHolding = async (
   }
 
   const { error } = await supabase
-    .from('holdings')
-    .delete()
+    .from('holdings').delete()
     .eq('id', input.id)
     .eq('user_id', userIdResult.userId);
 
