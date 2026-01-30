@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from './lib/supabase/middleware';
 
 const AUTH_ROUTES = ['/login', '/signup'] as const;
-const PROTECTED_ROUTES = ['/dashboard', '/portfolio'] as const;
+const BASE_PROTECTED_ROUTES = ['/dashboard'] as const;
+const PROTECTED_ROUTES = [...BASE_PROTECTED_ROUTES, '/portfolio'] as const;
 
 const isProtectedRoute = (pathname: string): boolean =>
   PROTECTED_ROUTES.some((route) => pathname.startsWith(route));

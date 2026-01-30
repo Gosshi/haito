@@ -23,3 +23,28 @@ export type NewHolding = {
   acquisition_price?: number | null;
   account_type: AccountType;
 };
+
+export type HoldingFieldErrors = {
+  shares?: string;
+  acquisition_price?: string;
+  account_type?: string;
+};
+
+export type HoldingUpdate = {
+  shares: number;
+  acquisition_price?: number | null;
+  account_type: AccountType;
+};
+
+export type UpdateHoldingInput = HoldingUpdate & {
+  id: string;
+};
+
+export type DeleteHoldingInput = {
+  id: string;
+};
+
+export type HoldingEditResult = {
+  errors: HoldingFieldErrors;
+  value?: HoldingUpdate;
+};

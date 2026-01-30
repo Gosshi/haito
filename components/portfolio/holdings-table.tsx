@@ -21,6 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
+import { DeleteHoldingDialog } from './delete-holding-dialog';
+import { EditHoldingDialog } from './edit-holding-dialog';
 
 const accountTypeLabels: Record<AccountType, string> = {
   specific: '特定口座',
@@ -92,6 +94,7 @@ export function HoldingsTable() {
                 <TableHead className="text-right">保有株数</TableHead>
                 <TableHead className="text-right">取得単価</TableHead>
                 <TableHead>口座種別</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -108,6 +111,12 @@ export function HoldingsTable() {
                     {formatAcquisitionPrice(holding.acquisition_price)}
                   </TableCell>
                   <TableCell>{formatAccountType(holding.account_type)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <EditHoldingDialog holding={holding} />
+                      <DeleteHoldingDialog holding={holding} />
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

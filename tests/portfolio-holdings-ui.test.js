@@ -63,3 +63,57 @@ test('holdings table shows legacy nisa label', () => {
   const content = readFileSync(pathOf(file), 'utf8');
   assert.match(content, /旧NISA/, 'legacy NISA label should be present');
 });
+
+test('edit holding dialog component exists', () => {
+  const file = 'components/portfolio/edit-holding-dialog.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(content, /Dialog/, 'edit dialog should use Dialog');
+  assert.match(
+    content,
+    /parseHoldingEditForm/,
+    'edit dialog should use validation helper'
+  );
+  assert.match(
+    content,
+    /updateHolding/,
+    'edit dialog should call updateHolding'
+  );
+  assert.match(content, /銘柄コード/, 'edit dialog should display stock code');
+});
+
+test('delete holding dialog component exists', () => {
+  const file = 'components/portfolio/delete-holding-dialog.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(content, /AlertDialog/, 'delete dialog should use AlertDialog');
+  assert.match(
+    content,
+    /deleteHolding/,
+    'delete dialog should call deleteHolding'
+  );
+  assert.match(
+    content,
+    /削除しますか/,
+    'delete dialog should ask confirmation'
+  );
+});
+
+test('holdings table includes edit/delete actions', () => {
+  const file = 'components/portfolio/holdings-table.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(
+    content,
+    /EditHoldingDialog/,
+    'holdings table should render edit dialog'
+  );
+  assert.match(
+    content,
+    /DeleteHoldingDialog/,
+    'holdings table should render delete dialog'
+  );
+});
