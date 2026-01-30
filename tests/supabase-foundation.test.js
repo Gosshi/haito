@@ -9,6 +9,7 @@ const pathOf = (rel) => join(root, rel);
 const supabaseFiles = [
   'lib/supabase/server.ts',
   'lib/supabase/client.ts',
+  'lib/supabase/middleware.ts',
 ];
 
 const requiredEnvVars = [
@@ -25,27 +26,73 @@ test('supabase client files exist', () => {
   }
 });
 
-test('supabase client files export createClient and use env vars', () => {
-  for (const file of supabaseFiles) {
-    const content = readFileSync(pathOf(file), 'utf8');
+test('browser supabase client uses supabase-js and env vars', () => {
+  const file = 'lib/supabase/client.ts';
+  const content = readFileSync(pathOf(file), 'utf8');
 
+  assert.ok(
+    /export\s+(const|function)\s+createClient/.test(content),
+    `${file} must export createClient`
+  );
+
+  assert.ok(
+    content.includes('@supabase/supabase-js'),
+    `${file} must import @supabase/supabase-js`
+  );
+
+  for (const envVar of requiredEnvVars) {
     assert.ok(
-      /export\s+(const|function)\s+createClient/.test(content),
-      `${file} must export createClient`
+      content.includes(envVar),
+      `${file} must reference ${envVar}`
     );
-
-    assert.ok(
-      content.includes('@supabase/supabase-js'),
-      `${file} must import @supabase/supabase-js`
-    );
-
-    for (const envVar of requiredEnvVars) {
-      assert.ok(
-        content.includes(envVar),
-        `${file} must reference ${envVar}`
-      );
-    }
   }
+});
+
+test('server supabase client uses @supabase/ssr and cookies', () => {
+  const file = 'lib/supabase/server.ts';
+  const content = readFileSync(pathOf(file), 'utf8');
+
+  assert.ok(
+    /export\s+(const|function)\s+createClient/.test(content),
+    `${file} must export createClient`
+  );
+
+  assert.ok(
+    content.includes('@supabase/ssr'),
+    `${file} must import @supabase/ssr`
+  );
+
+  assert.ok(
+    content.includes('next/headers'),
+    `${file} must import next/headers for cookies`
+  );
+
+  for (const envVar of requiredEnvVars) {
+    assert.ok(
+      content.includes(envVar),
+      `${file} must reference ${envVar}`
+    );
+  }
+});
+
+test('middleware supabase client uses @supabase/ssr and NextResponse', () => {
+  const file = 'lib/supabase/middleware.ts';
+  const content = readFileSync(pathOf(file), 'utf8');
+
+  assert.ok(
+    /export\s+(const|function)\s+createMiddlewareClient/.test(content),
+    `${file} must export createMiddlewareClient`
+  );
+
+  assert.ok(
+    content.includes('@supabase/ssr'),
+    `${file} must import @supabase/ssr`
+  );
+
+  assert.ok(
+    content.includes('next/server'),
+    `${file} must import next/server`
+  );
 });
 
 test('.env.local.example lists Supabase env vars with comments', () => {
