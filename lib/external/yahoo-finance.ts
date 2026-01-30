@@ -9,6 +9,10 @@ import type {
 
 const STOCK_CODE_REGEX = /^\d{4}$/;
 const yahooFinanceClient = new YahooFinance();
+const yahooFinanceQuoteOptions = {
+  lang: 'ja-JP',
+  region: 'JP',
+} as const;
 
 const normalizeStockCode = (code: string): string => {
   const trimmed = code.trim().toUpperCase();
@@ -127,7 +131,10 @@ export class YahooFinanceProvider implements DividendProvider {
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
-        const result = await yahooFinanceClient.quote(symbol);
+        const result = await yahooFinanceClient.quote(
+          symbol,
+          yahooFinanceQuoteOptions
+        );
 
         if (!result) {
           return {
