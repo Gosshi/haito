@@ -2,10 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 
 import type { AccountType, NewHolding } from '../../lib/holdings/types';
 import { useHoldingsStore } from '../../stores/holdings-store';
+import { pushToast } from '../../stores/toast-store';
 import { Button } from '../ui/button';
 import {
   Card,
@@ -45,6 +46,8 @@ const isAccountType = (value: string): value is AccountType =>
 
 const normalizeValue = (value: FormDataEntryValue | null): string =>
   typeof value === 'string' ? value.trim() : '';
+
+const isValidStockCode = (value: string): boolean => /^\d{4}$/.test(value);
 
 const parseHoldingForm = (formData: FormData): ParsedHoldingForm => {
   const stockCode = normalizeValue(formData.get('stock_code'));
@@ -112,7 +115,81 @@ export function AddHoldingForm() {
   const isLoading = useHoldingsStore((state) => state.isLoading);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [stockCode, setStockCode] = useState<string>('');
+  const [stockName, setStockName] = useState<string>('');
+  const [stockNameError, setStockNameError] = useState<string | null>(null);
+  const [isStockNameLoading, setIsStockNameLoading] = useState<boolean>(false);
+  const lastFetchedCode = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const fetchStockName = async (code: string) => {
+    if (!isValidStockCode(code)) {
+      return;
+    }
+
+    setIsStockNameLoading(true);
+    setStockNameError(null);
+
+    try {
+      const response = await fetch(`/api/dividends/fetch?code=${code}`);
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data || data.ok === false) {
+        const message =
+          (data && data.error && data.error.message) ||
+          '銘柄名を取得できませんでした。';
+        setStockNameError(message);
+        return;
+      }
+
+      const name =
+        data && data.data && typeof data.data.stock_name === 'string'
+          ? data.data.stock_name
+          : '';
+      setStockName(name);
+      lastFetchedCode.current = code;
+    } catch (error) {
+      setStockNameError('銘柄名を取得できませんでした。');
+    } finally {
+      setIsStockNameLoading(false);
+    }
+  };
+
+  const fetchDividendAfterCreate = async (code: string) => {
+    if (!isValidStockCode(code)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/dividends/fetch?code=${code}`);
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data || data.ok === false) {
+        pushToast('配当データの取得に失敗しました。', 'error');
+      }
+    } catch (error) {
+      pushToast('配当データの取得に失敗しました。', 'error');
+    }
+  };
+
+  useEffect(() => {
+    const trimmed = stockCode.trim();
+    if (!isValidStockCode(trimmed)) {
+      setStockNameError(null);
+      lastFetchedCode.current = null;
+      return;
+    }
+
+    if (lastFetchedCode.current === trimmed) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchStockName(trimmed);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [stockCode]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -140,6 +217,7 @@ export function AddHoldingForm() {
         return;
       }
 
+      await fetchDividendAfterCreate(value.stock_code);
       router.push('/portfolio');
     });
   };
@@ -161,6 +239,10 @@ export function AddHoldingForm() {
               name="stock_code"
               inputMode="numeric"
               maxLength={4}
+              value={stockCode}
+              onChange={(event) => {
+                setStockCode(event.target.value);
+              }}
               aria-invalid={Boolean(fieldErrors.stock_code)}
             />
             {fieldErrors.stock_code && (
@@ -173,10 +255,18 @@ export function AddHoldingForm() {
             <Input
               id="stock-name"
               name="stock_name"
+              value={stockName}
+              onChange={(event) => setStockName(event.target.value)}
               aria-invalid={Boolean(fieldErrors.stock_name)}
             />
             {fieldErrors.stock_name && (
               <p className="text-sm text-red-600">{fieldErrors.stock_name}</p>
+            )}
+            {isStockNameLoading && (
+              <p className="text-sm text-muted-foreground">銘柄名を取得中...</p>
+            )}
+            {stockNameError && (
+              <p className="text-sm text-red-600">{stockNameError}</p>
             )}
           </div>
 

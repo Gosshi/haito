@@ -23,6 +23,7 @@ import {
 } from '../ui/table';
 import { DeleteHoldingDialog } from './delete-holding-dialog';
 import { EditHoldingDialog } from './edit-holding-dialog';
+import { RefreshDividendsButton } from './refresh-dividends-button';
 
 const accountTypeLabels: Record<AccountType, string> = {
   specific: '特定口座',
@@ -66,9 +67,12 @@ export function HoldingsTable() {
             登録済みの銘柄を一覧で確認できます。
           </CardDescription>
         </div>
-        <Button type="button" onClick={handleAddHolding}>
-          銘柄を追加
-        </Button>
+        <div className="flex items-center gap-2">
+          <RefreshDividendsButton />
+          <Button type="button" onClick={handleAddHolding}>
+            銘柄を追加
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p className="text-sm text-red-600">{error}</p>}
