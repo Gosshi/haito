@@ -35,6 +35,34 @@ const toSymbol = (code: string): string => {
 const toNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
+const JAPANESE_TEXT_REGEX = /[\u3040-\u30ff\u3400-\u9faf]/;
+
+const hasJapaneseText = (value: string): boolean => JAPANESE_TEXT_REGEX.test(value);
+
+const pickStockName = (
+  shortName: unknown,
+  longName: unknown
+): string | null => {
+  const short =
+    typeof shortName === 'string' && shortName.trim().length > 0
+      ? shortName.trim()
+      : null;
+  const long =
+    typeof longName === 'string' && longName.trim().length > 0
+      ? longName.trim()
+      : null;
+
+  if (long && hasJapaneseText(long)) {
+    return long;
+  }
+
+  if (short && hasJapaneseText(short)) {
+    return short;
+  }
+
+  return long ?? short;
+};
+
 const normalizeYield = (value: number | null): number | null => {
   if (value === null) {
     return null;
@@ -154,10 +182,7 @@ export class YahooFinanceProvider implements DividendProvider {
 
         const snapshot: DividendSnapshot = {
           stock_code: normalizeStockCode(code),
-          stock_name:
-            (typeof result.shortName === 'string' && result.shortName) ||
-            (typeof result.longName === 'string' && result.longName) ||
-            null,
+          stock_name: pickStockName(result.shortName, result.longName),
           annual_dividend: annualDividendRaw ?? null,
           dividend_yield: normalizeYield(dividendYieldRaw),
           ex_dividend_months: null,
