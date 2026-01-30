@@ -2,11 +2,18 @@
 
 import { create } from 'zustand';
 
-import type { Holding, NewHolding } from '../lib/holdings/types';
+import type {
+  DeleteHoldingInput,
+  Holding,
+  NewHolding,
+  UpdateHoldingInput,
+} from '../lib/holdings/types';
 import {
   createHolding,
+  deleteHolding as deleteHoldingApi,
   fetchHoldings as fetchHoldingsApi,
   type HoldingsErrorType,
+  updateHolding as updateHoldingApi,
 } from '../lib/api/holdings';
 
 export type HoldingsActionResult =
@@ -19,9 +26,11 @@ type HoldingsState = {
   error: string | null;
   fetchHoldings: () => Promise<void>;
   addHolding: (input: NewHolding) => Promise<HoldingsActionResult>;
+  updateHolding: (input: UpdateHoldingInput) => Promise<HoldingsActionResult>;
+  deleteHolding: (input: DeleteHoldingInput) => Promise<HoldingsActionResult>;
 };
 
-export const useHoldingsStore = create<HoldingsState>((set) => ({
+export const useHoldingsStore = create<HoldingsState>((set, get) => ({
   holdings: [],
   isLoading: false,
   error: null,
@@ -60,6 +69,63 @@ export const useHoldingsStore = create<HoldingsState>((set) => ({
     }
 
     set({ holdings: refreshResult.data, isLoading: false, error: null });
+    return { ok: true };
+  },
+  updateHolding: async (input) => {
+    const previousHoldings = get().holdings;
+    const updatedHoldings = previousHoldings.map((holding) =>
+      holding.id === input.id
+        ? {
+            ...holding,
+            shares: input.shares,
+            acquisition_price: input.acquisition_price ?? null,
+            account_type: input.account_type,
+          }
+        : holding
+    );
+
+    set({ holdings: updatedHoldings, isLoading: true, error: null });
+
+    const updateResult = await updateHoldingApi(input);
+    if (!updateResult.ok) {
+      set({
+        holdings: previousHoldings,
+        isLoading: false,
+        error: updateResult.error.message,
+      });
+      return {
+        ok: false,
+        error: updateResult.error.message,
+        errorType: updateResult.error.type,
+      };
+    }
+
+    set({ isLoading: false, error: null });
+    return { ok: true };
+  },
+  deleteHolding: async (input) => {
+    const previousHoldings = get().holdings;
+    const updatedHoldings = previousHoldings.filter(
+      (holding) => holding.id !== input.id
+    );
+
+    set({ holdings: updatedHoldings, isLoading: true, error: null });
+
+    const deleteResult = await deleteHoldingApi(input);
+    if (!deleteResult.ok) {
+      set({
+        holdings: previousHoldings,
+        isLoading: false,
+        error: deleteResult.error.message,
+      });
+      return {
+        ok: false,
+        error: deleteResult.error.message,
+        errorType: deleteResult.error.type,
+      };
+    }
+
+    set({ isLoading: false, error: null });
     return { ok: true };
   },
 }));

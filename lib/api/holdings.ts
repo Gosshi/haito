@@ -1,6 +1,11 @@
 import { createClient } from '../supabase/client';
 
-import type { Holding, NewHolding } from '../holdings/types';
+import type {
+  DeleteHoldingInput,
+  Holding,
+  NewHolding,
+  UpdateHoldingInput,
+} from '../holdings/types';
 
 export type HoldingsErrorType = 'duplicate' | 'unauthorized' | 'unknown';
 
@@ -88,6 +93,74 @@ export const createHolding = async (
       };
     }
 
+    return {
+      ok: false,
+      error: { type: 'unknown', message: error.message },
+    };
+  }
+
+  return { ok: true, data: null };
+};
+
+export const updateHolding = async (
+  input: UpdateHoldingInput
+): Promise<HoldingsResult<null>> => {
+  const supabase = createClient();
+  const userIdResult = await getUserId();
+
+  if (!userIdResult.ok) {
+    return { ok: false, error: userIdResult.error };
+  }
+
+  const payload = {
+    shares: input.shares,
+    acquisition_price: input.acquisition_price ?? null,
+    account_type: input.account_type,
+  };
+
+  const { error } = await supabase
+    .from('holdings')
+    .update(payload)
+    .eq('id', input.id)
+    .eq('user_id', userIdResult.userId);
+
+  if (error) {
+    if (error.code === DUPLICATE_ERROR_CODE) {
+      return {
+        ok: false,
+        error: {
+          type: 'duplicate',
+          message: 'This holding already exists.',
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      error: { type: 'unknown', message: error.message },
+    };
+  }
+
+  return { ok: true, data: null };
+};
+
+export const deleteHolding = async (
+  input: DeleteHoldingInput
+): Promise<HoldingsResult<null>> => {
+  const supabase = createClient();
+  const userIdResult = await getUserId();
+
+  if (!userIdResult.ok) {
+    return { ok: false, error: userIdResult.error };
+  }
+
+  const { error } = await supabase
+    .from('holdings')
+    .delete()
+    .eq('id', input.id)
+    .eq('user_id', userIdResult.userId);
+
+  if (error) {
     return {
       ok: false,
       error: { type: 'unknown', message: error.message },
