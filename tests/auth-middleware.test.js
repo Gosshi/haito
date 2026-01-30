@@ -87,3 +87,21 @@ test('middleware config matches auth and dashboard routes', () => {
     'middleware matcher should include /signup'
   );
 });
+
+test('middleware protects portfolio routes', () => {
+  const content = loadMiddleware();
+
+  assert.ok(
+    content.includes("'/portfolio'"),
+    'middleware should protect /portfolio routes'
+  );
+});
+
+test('middleware matcher includes portfolio routes', () => {
+  const content = loadMiddleware();
+
+  assert.ok(
+    content.includes('/portfolio'),
+    'middleware matcher should include /portfolio routes'
+  );
+});

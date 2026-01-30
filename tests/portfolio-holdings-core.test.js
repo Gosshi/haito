@@ -36,3 +36,21 @@ test('holdings store module exists', () => {
   );
   assert.match(content, /addHolding/, 'addHolding action must be defined');
 });
+
+test('holdings store uses holdings api module', () => {
+  const file = 'stores/holdings-store.ts';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(
+    content,
+    /from\s+['"]\.\.\/lib\/api\/holdings['"]/,
+    'holdings store should import holdings api module'
+  );
+  assert.match(content, /createHolding/, 'store should use createHolding');
+  assert.match(
+    content,
+    /fetchHoldings/,
+    'store should use fetchHoldings API'
+  );
+});

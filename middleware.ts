@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createMiddlewareClient } from './lib/supabase/middleware';
 
 const AUTH_ROUTES = ['/login', '/signup'] as const;
-const PROTECTED_ROUTES = ['/dashboard'] as const;
+const PROTECTED_ROUTES = ['/dashboard', '/portfolio'] as const;
 
 const isProtectedRoute = (pathname: string): boolean =>
   PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
@@ -44,5 +44,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/signup'],
+  matcher: ['/dashboard/:path*', '/portfolio/:path*', '/login', '/signup'],
 };

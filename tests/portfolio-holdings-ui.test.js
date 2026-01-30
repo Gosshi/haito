@@ -39,3 +39,27 @@ test('add holding form includes account type options', () => {
   assert.match(content, /nisa_legacy/, 'nisa_legacy option must be present');
   assert.match(content, /account_type|accountType/, 'account type input must be present');
 });
+
+test('holdings table component connects to holdings store', () => {
+  const file = 'components/portfolio/holdings-table.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(content, /useHoldingsStore/, 'holdings table should use holdings store');
+});
+
+test('add holding form component connects to holdings store', () => {
+  const file = 'components/portfolio/add-holding-form.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(content, /useHoldingsStore/, 'add holding form should use holdings store');
+});
+
+test('holdings table shows legacy nisa label', () => {
+  const file = 'components/portfolio/holdings-table.tsx';
+  assert.ok(existsSync(pathOf(file)), `${file} must exist`);
+
+  const content = readFileSync(pathOf(file), 'utf8');
+  assert.match(content, /旧NISA/, 'legacy NISA label should be present');
+});
