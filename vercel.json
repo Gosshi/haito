@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/dividends/fetch",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
