@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/Gosshi/haito#readme",
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.93.3",
     "next": "^14.2.35",
     "react": "^18.3.1",
