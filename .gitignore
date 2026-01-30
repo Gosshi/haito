@@ -17,8 +17,7 @@ dist/
 venv/
 .venv/
 env/
-.env
-.env.local
+.env*
 
 # Testing
 .pytest_cache/
