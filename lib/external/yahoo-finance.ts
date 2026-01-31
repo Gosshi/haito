@@ -8,7 +8,7 @@ import type {
 } from '../dividends/types';
 
 const STOCK_CODE_REGEX = /^\d{4}$/;
-const yahooFinanceClient = new YahooFinance();
+const yahooFinanceClient = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 const yahooFinanceQuoteOptions = {
   lang: 'ja-JP',
   region: 'JP',
@@ -84,69 +84,51 @@ const isRateLimitError = (message: string): boolean =>
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-type YahooDateValue =
-  | { raw?: number | string; fmt?: string }
-  | Array<{ raw?: number | string; fmt?: string }>
-  | number
-  | string
-  | null
-  | undefined;
-
-const toDate = (value: YahooDateValue): Date | null => {
-  if (!value) {
-    return null;
-  }
-
-  if (Array.isArray(value)) {
-    const first = value.find((item) => item != null);
-    return first ? toDate(first) : null;
-  }
-
-  if (typeof value === 'number') {
-    const timestamp = value > 10_000_000_000 ? value : value * 1000;
-    return new Date(timestamp);
-  }
-
-  if (typeof value === 'string') {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  if (typeof value === 'object') {
-    if (typeof value.raw === 'number' || typeof value.raw === 'string') {
-      return toDate(value.raw);
-    }
-    if (typeof value.fmt === 'string') {
-      return toDate(value.fmt);
-    }
-  }
-
-  return null;
-};
-
-const extractMonths = (value: YahooDateValue): number[] | null => {
-  if (!value) {
-    return null;
-  }
-
-  const values = Array.isArray(value) ? value : [value];
-  const months = values
-    .map((item) => toDate(item))
-    .filter((date): date is Date => Boolean(date))
-    .map((date) => date.getUTCMonth() + 1)
-    .filter((month) => month >= 1 && month <= 12);
-
-  if (months.length === 0) {
-    return null;
-  }
-
-  return Array.from(new Set(months)).sort((a, b) => a - b);
-};
-
 const buildError = (type: DividendApiError['type'], message: string): DividendApiError => ({
   type,
   message,
 });
+
+type HistoricalDividendRow = {
+  date?: Date | string;
+  dividends?: number;
+};
+
+const fetchPaymentMonthsFromHistory = async (
+  symbol: string
+): Promise<number[] | null> => {
+  try {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 2);
+
+    const history = await yahooFinanceClient.historical(symbol, {
+      period1: startDate,
+      period2: endDate,
+      events: 'dividends',
+    });
+
+    if (!Array.isArray(history) || history.length === 0) {
+      return null;
+    }
+
+    const months = (history as HistoricalDividendRow[])
+      .map((row) => {
+        if (!row.date) return null;
+        const date = row.date instanceof Date ? row.date : new Date(row.date);
+        return Number.isNaN(date.getTime()) ? null : date.getUTCMonth() + 1;
+      })
+      .filter((month): month is number => month !== null && month >= 1 && month <= 12);
+
+    if (months.length === 0) {
+      return null;
+    }
+
+    return Array.from(new Set(months)).sort((a, b) => a - b);
+  } catch {
+    return null;
+  }
+};
 
 export class YahooFinanceProvider implements DividendProvider {
   name = 'yahoo-finance2';
@@ -177,8 +159,8 @@ export class YahooFinanceProvider implements DividendProvider {
         const dividendYieldRaw =
           toNumber(result.dividendYield) ??
           toNumber(result.trailingAnnualDividendYield);
-        const dividendDate =
-          result.dividendDate instanceof Date ? result.dividendDate : null;
+
+        const paymentMonths = await fetchPaymentMonthsFromHistory(symbol);
 
         const snapshot: DividendSnapshot = {
           stock_code: normalizeStockCode(code),
@@ -186,9 +168,7 @@ export class YahooFinanceProvider implements DividendProvider {
           annual_dividend: annualDividendRaw ?? null,
           dividend_yield: normalizeYield(dividendYieldRaw),
           ex_dividend_months: null,
-          payment_months: dividendDate
-            ? [dividendDate.getUTCMonth() + 1]
-            : null,
+          payment_months: paymentMonths,
           last_updated: new Date().toISOString(),
         };
 
