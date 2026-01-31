@@ -18,10 +18,18 @@ export function createClient(): SupabaseClient<Database> {
     cookies: {
       get: (name) => cookieStore.get(name)?.value,
       set: (name, value, options) => {
-        cookieStore.set({ name, value, ...options });
+        try {
+          cookieStore.set({ name, value, ...options });
+        } catch {
+          // Server Componentではcookieの設定は無視する
+        }
       },
       remove: (name, options) => {
-        cookieStore.set({ name, value: '', ...options });
+        try {
+          cookieStore.set({ name, value: '', ...options });
+        } catch {
+          // Server Componentではcookieの削除は無視する
+        }
       },
     },
   });
