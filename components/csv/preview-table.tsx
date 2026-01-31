@@ -2,6 +2,7 @@
 
 import type { CsvParseResult } from '../../lib/csv/types';
 import type { AccountType, NewHolding } from '../../lib/holdings/types';
+import type { DuplicateInfo } from '../../lib/api/holdings-bulk';
 import {
   Table,
   TableBody,
@@ -28,16 +29,22 @@ const formatAcquisitionPrice = (value: number | null | undefined): string =>
 
 export interface PreviewTableProps {
   parseResult: CsvParseResult;
+  duplicates?: DuplicateInfo[];
 }
 
 type RowData = {
   rowNumber: number;
   holding: NewHolding | null;
   error: string | null;
+  isDuplicate: boolean;
+  holdingIndex: number;
 };
 
-export function PreviewTable({ parseResult }: PreviewTableProps) {
+export function PreviewTable({ parseResult, duplicates = [] }: PreviewTableProps) {
   const { holdings, errors } = parseResult;
+
+  // Build a set of duplicate row indices for quick lookup
+  const duplicateRowIndices = new Set(duplicates.map((d) => d.rowNumber));
 
   // Create a map of errors by line number
   const errorsByLine = new Map<number, string>();
@@ -98,6 +105,8 @@ export function PreviewTable({ parseResult }: PreviewTableProps) {
         rowNumber: rowNum,
         holding: null,
         error: errorsByLine.get(rowNum) ?? null,
+        isDuplicate: false,
+        holdingIndex: -1,
       });
     } else {
       const idx = validRowNumbers.indexOf(rowNum);
@@ -106,10 +115,15 @@ export function PreviewTable({ parseResult }: PreviewTableProps) {
           rowNumber: rowNum,
           holding: holdings[idx],
           error: null,
+          isDuplicate: duplicateRowIndices.has(idx),
+          holdingIndex: idx,
         });
       }
     }
   }
+
+  // Count duplicates for summary
+  const duplicateCount = duplicates.length;
 
   if (rows.length === 0) {
     return (
@@ -120,59 +134,76 @@ export function PreviewTable({ parseResult }: PreviewTableProps) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-16">行番号</TableHead>
-          <TableHead>銘柄コード</TableHead>
-          <TableHead>銘柄名</TableHead>
-          <TableHead className="text-right">保有株数</TableHead>
-          <TableHead className="text-right">取得単価</TableHead>
-          <TableHead>口座種別</TableHead>
-          <TableHead className="w-24">ステータス</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => {
-          const hasError = row.error !== null;
-          const rowClassName = hasError ? 'bg-red-50' : '';
+    <div>
+      <div className="mb-2 text-sm text-muted-foreground">
+        重複: {duplicateCount}件
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-16">行番号</TableHead>
+            <TableHead>銘柄コード</TableHead>
+            <TableHead>銘柄名</TableHead>
+            <TableHead className="text-right">保有株数</TableHead>
+            <TableHead className="text-right">取得単価</TableHead>
+            <TableHead>口座種別</TableHead>
+            <TableHead className="w-24">ステータス</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            const hasError = row.error !== null;
+            const isDuplicate = row.isDuplicate;
 
-          if (hasError) {
+            // Determine row background color
+            let rowClassName = '';
+            if (hasError) {
+              rowClassName = 'bg-red-50';
+            } else if (isDuplicate) {
+              rowClassName = 'bg-yellow-50';
+            }
+
+            if (hasError) {
+              return (
+                <TableRow key={row.rowNumber} className={rowClassName}>
+                  <TableCell>{row.rowNumber}</TableCell>
+                  <TableCell colSpan={5} title={row.error ?? undefined}>
+                    <span className="text-red-600">{row.error}</span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-red-600">エラー</span>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+
+            const holding = row.holding;
+            if (!holding) return null;
+
             return (
               <TableRow key={row.rowNumber} className={rowClassName}>
                 <TableCell>{row.rowNumber}</TableCell>
-                <TableCell colSpan={5} title={row.error ?? undefined}>
-                  <span className="text-red-600">{row.error}</span>
+                <TableCell className="font-medium">{holding.stock_code}</TableCell>
+                <TableCell>{holding.stock_name ?? '-'}</TableCell>
+                <TableCell className="text-right">
+                  {formatShares(holding.shares)}
                 </TableCell>
+                <TableCell className="text-right">
+                  {formatAcquisitionPrice(holding.acquisition_price)}
+                </TableCell>
+                <TableCell>{formatAccountType(holding.account_type)}</TableCell>
                 <TableCell>
-                  <span className="text-red-600">エラー</span>
+                  {isDuplicate ? (
+                    <span className="text-yellow-600">重複</span>
+                  ) : (
+                    <span className="text-emerald-600">OK</span>
+                  )}
                 </TableCell>
               </TableRow>
             );
-          }
-
-          const holding = row.holding;
-          if (!holding) return null;
-
-          return (
-            <TableRow key={row.rowNumber} className={rowClassName}>
-              <TableCell>{row.rowNumber}</TableCell>
-              <TableCell className="font-medium">{holding.stock_code}</TableCell>
-              <TableCell>{holding.stock_name ?? '-'}</TableCell>
-              <TableCell className="text-right">
-                {formatShares(holding.shares)}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatAcquisitionPrice(holding.acquisition_price)}
-              </TableCell>
-              <TableCell>{formatAccountType(holding.account_type)}</TableCell>
-              <TableCell>
-                <span className="text-emerald-600">OK</span>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
