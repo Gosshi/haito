@@ -15,8 +15,8 @@ describe('sbi format', () => {
   describe('SBI_HEADERS', () => {
     it('SBI証券CSVのヘッダー列名を定義している', () => {
       expect(SBI_HEADERS).toContain('銘柄（コード）');
-      expect(SBI_HEADERS).toContain('取得日');
-      expect(SBI_HEADERS).toContain('保有数');
+      expect(SBI_HEADERS).toContain('買付日');
+      expect(SBI_HEADERS).toContain('数量');
       expect(SBI_HEADERS).toContain('取得単価');
     });
   });
@@ -167,8 +167,8 @@ describe('sbi format', () => {
     it('SBI証券CSV行をNewHoldingに変換する', () => {
       const row: CsvRow = {
         '銘柄（コード）': '9104 商船三井',
-        '取得日': '2023/01/16',
-        '保有数': '100',
+        '買付日': '2023/01/16',
+        '数量': '100',
         '取得単価': '3200',
         '現在値': '4839',
         '前日比': '-5',
@@ -189,8 +189,8 @@ describe('sbi format', () => {
     it('口座種別を正しく設定する', () => {
       const row: CsvRow = {
         '銘柄（コード）': '9104 商船三井',
-        '取得日': '2023/01/16',
-        '保有数': '100',
+        '買付日': '2023/01/16',
+        '数量': '100',
         '取得単価': '3200',
         '__account_type': 'nisa_growth',
       };
@@ -203,8 +203,8 @@ describe('sbi format', () => {
     it('取得単価が「----」の場合はnullを設定する', () => {
       const row: CsvRow = {
         '銘柄（コード）': '9104 商船三井',
-        '取得日': '----/--/--',
-        '保有数': '100',
+        '買付日': '----/--/--',
+        '数量': '100',
         '取得単価': '----',
       };
 
@@ -213,10 +213,10 @@ describe('sbi format', () => {
       expect(result.acquisition_price).toBeNull();
     });
 
-    it('保有数の小数点を正しく処理する', () => {
+    it('数量の小数点を正しく処理する', () => {
       const row: CsvRow = {
         '銘柄（コード）': '9104 商船三井',
-        '保有数': '100.5',
+        '数量': '100.5',
         '取得単価': '3200',
       };
 
@@ -228,7 +228,7 @@ describe('sbi format', () => {
     it('デフォルトの口座種別はspecificになる', () => {
       const row: CsvRow = {
         '銘柄（コード）': '9104 商船三井',
-        '保有数': '100',
+        '数量': '100',
         '取得単価': '3200',
       };
 

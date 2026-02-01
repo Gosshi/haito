@@ -4,8 +4,8 @@ import type { CsvMapper, CsvRow } from '../types';
 /** SBI証券CSVのヘッダー列名 */
 export const SBI_HEADERS = [
   '銘柄（コード）',
-  '取得日',
-  '保有数',
+  '買付日',
+  '数量',
   '取得単価',
   '現在値',
   '前日比',
@@ -17,6 +17,12 @@ export const SBI_HEADERS = [
 
 /** SBI証券の口座種別マッピング */
 export const SBI_ACCOUNT_TYPE_MAP: Record<string, AccountType> = {
+  // 新フォーマット（現物/〜預り）
+  '特定預り': 'specific',
+  'NISA預り（成長投資枠）': 'nisa_growth',
+  'NISA預り（つみたて投資枠）': 'nisa_tsumitate',
+  '旧つみたてNISA預り': 'nisa_legacy',
+  // 旧フォーマット互換
   '特定/一般口座': 'specific',
   'NISA口座(成長投資枠)': 'nisa_growth',
   'NISA口座(つみたて投資枠)': 'nisa_tsumitate',
@@ -31,11 +37,19 @@ export const SBI_ACCOUNT_TYPE_MAP: Record<string, AccountType> = {
 export function isSectionHeader(firstCell: string): boolean {
   if (!firstCell) return false;
 
-  // 国内株式(特定/一般口座) 形式
+  // 株式（現物/特定預り）形式
+  if (firstCell.startsWith('株式（現物/')) return true;
+  if (firstCell.startsWith('株式(現物/')) return true;
+
+  // 国内株式(特定/一般口座) 形式（旧フォーマット互換）
   if (firstCell.startsWith('国内株式(')) return true;
 
-  // 投資信託(数量/...) 形式
-  if (firstCell.startsWith('投資信託(')) return true;
+  // 投資信託（金額/...）形式
+  if (firstCell.startsWith('投資信託（金額/')) return true;
+  if (firstCell.startsWith('投資信託(金額/')) return true;
+
+  // 投資信託(数量/...) 形式（旧フォーマット互換）
+  if (firstCell.startsWith('投資信託(数量/')) return true;
 
   return false;
 }
@@ -120,7 +134,7 @@ export const mapToHolding: CsvMapper = (row: CsvRow): NewHolding => {
   const codeWithName = (row['銘柄（コード）'] ?? '').trim();
   const { code, name } = extractStockCode(codeWithName);
 
-  const sharesStr = (row['保有数'] ?? '').trim();
+  const sharesStr = (row['数量'] ?? '').trim();
   const acquisitionPriceStr = (row['取得単価'] ?? '').trim();
   const accountType = (row['__account_type'] as AccountType) ?? 'specific';
 
