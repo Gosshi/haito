@@ -78,6 +78,43 @@ describe('detectFormat', () => {
     });
   });
 
+  describe('楽天証券フォーマット検出', () => {
+    test('楽天証券のヘッダー「銘柄」を含み「銘柄（コード）」を含まない場合は rakuten を返す', () => {
+      const content = '銘柄,口座,保有数量,平均取得価額,現在値\n9104 商船三井,特定,100,3500,4000';
+      expect(detectFormat(content)).toBe('rakuten');
+    });
+
+    test('楽天証券CSVの完全なヘッダー行を検出する', () => {
+      const content = `銘柄,口座,保有数量,平均取得価額,現在値,時価評価額,評価損益,評価損益率
+9104 商船三井,特定,100,3200,4839,483900,163900,51.22`;
+      expect(detectFormat(content)).toBe('rakuten');
+    });
+
+    test('ダブルクォートで囲まれた楽天証券ヘッダーを検出する', () => {
+      const content = `"銘柄","口座","保有数量","平均取得価額"
+"9104 商船三井","特定","100","3200"`;
+      expect(detectFormat(content)).toBe('rakuten');
+    });
+
+    test('先頭に空行がある場合も楽天証券を検出する', () => {
+      const content = `
+銘柄,口座,保有数量,平均取得価額
+9104 商船三井,特定,100,3200`;
+      expect(detectFormat(content)).toBe('rakuten');
+    });
+
+    test('CRLFの改行コードでも楽天証券を検出する', () => {
+      const content = '銘柄,口座,保有数量,平均取得価額\r\n9104 商船三井,特定,100,3200';
+      expect(detectFormat(content)).toBe('rakuten');
+    });
+
+    test('SBI証券と楽天証券が混在しない（SBI優先）', () => {
+      // SBIのヘッダーがある場合はSBIとして検出
+      const content = '銘柄（コード）,買付日,数量,取得単価\n9104 商船三井,2024/01/01,100,3500';
+      expect(detectFormat(content)).toBe('sbi');
+    });
+  });
+
   describe('型定義', () => {
     test('DetectedFormat型はすべての想定値を含む', () => {
       const formats: DetectedFormat[] = ['generic', 'sbi', 'rakuten', 'unknown'];
