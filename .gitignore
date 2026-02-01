@@ -49,3 +49,7 @@ htmlcov/
 node_modules
 
 .next
+.DS_Store
+
+# my Portfolio
+my_data/
