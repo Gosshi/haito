@@ -3,16 +3,21 @@
 import type { DragEvent, ChangeEvent } from 'react';
 import { useRef, useState, useCallback } from 'react';
 
+import { decodeToString } from '../../lib/csv/encoding';
+import { detectFormat } from '../../lib/csv/detect-format';
+import type { DetectedFormat } from '../../lib/csv/detect-format';
 import { Button } from '../ui/button';
 
 export interface FileUploadProps {
   onFileLoad: (content: string) => void;
+  onFormatDetected?: (format: DetectedFormat) => void;
   isLoading?: boolean;
   accept?: string;
 }
 
 export function FileUpload({
   onFileLoad,
+  onFormatDetected,
   isLoading = false,
   accept = '.csv',
 }: FileUploadProps) {
@@ -23,14 +28,17 @@ export function FileUpload({
     (file: File) => {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const content = event.target?.result;
-        if (typeof content === 'string') {
+        const result = event.target?.result;
+        if (result instanceof ArrayBuffer) {
+          const content = decodeToString(result);
+          const format = detectFormat(content);
+          onFormatDetected?.(format);
           onFileLoad(content);
         }
       };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     },
-    [onFileLoad]
+    [onFileLoad, onFormatDetected]
   );
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -111,7 +119,7 @@ export function FileUpload({
       >
         {isLoading ? '読み込み中...' : 'ファイルを選択'}
       </Button>
-      <p className="text-xs text-muted-foreground">対応フォーマット: 汎用CSV</p>
+      <p className="text-xs text-muted-foreground">対応フォーマット: 汎用CSV、SBI証券</p>
     </div>
   );
 }

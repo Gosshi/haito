@@ -1,6 +1,8 @@
 import type { CsvFormat, CsvParseResult, CsvRow, CsvValidationError } from './types';
 import { validateRow } from './validation';
 import { getMapper } from './formats';
+import { isSectionHeader, isSummaryRow, isDataHeader, extractAccountType } from './formats/sbi';
+import type { AccountType } from '../holdings/types';
 
 /**
  * UTF-8 BOMを除去する
@@ -134,6 +136,18 @@ function splitLines(content: string): string[] {
  * @returns パース結果（成功データとエラー情報）
  */
 export function parseCsv(content: string, format: CsvFormat): CsvParseResult {
+  // SBIフォーマットは特別なパース処理が必要
+  if (format === 'sbi') {
+    return parseSbiCsv(content);
+  }
+
+  return parseGenericCsv(content, format);
+}
+
+/**
+ * 汎用CSVフォーマットをパースする
+ */
+function parseGenericCsv(content: string, format: CsvFormat): CsvParseResult {
   const holdings: CsvParseResult['holdings'] = [];
   const errors: CsvValidationError[] = [];
 
@@ -192,6 +206,92 @@ export function parseCsv(content: string, format: CsvFormat): CsvParseResult {
     } else {
       // エラーを追加
       errors.push(...validationResult.errors);
+    }
+  }
+
+  return { holdings, errors };
+}
+
+/**
+ * SBI証券CSVフォーマットをパースする
+ * セクションヘッダー、集計行、タイトル行をスキップし、
+ * 各セクションから口座種別を推論してデータ行をパースする
+ */
+function parseSbiCsv(content: string): CsvParseResult {
+  const holdings: CsvParseResult['holdings'] = [];
+  const errors: CsvValidationError[] = [];
+
+  // BOM除去
+  const cleanContent = removeBom(content);
+
+  // 行分割
+  const lines = splitLines(cleanContent);
+
+  // マッパーを取得
+  const mapper = getMapper('sbi');
+
+  // 現在のセクションの口座種別
+  let currentAccountType: AccountType = 'specific';
+
+  // 現在のヘッダー行
+  let currentHeaders: string[] = [];
+
+  // 状態: ヘッダー行を探している状態
+  let lookingForData = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === '') {
+      continue;
+    }
+
+    const fields = parseFields(line);
+    const firstCell = fields[0];
+
+    // セクションヘッダー行を検出
+    if (isSectionHeader(firstCell)) {
+      // 新しいセクション開始、口座種別を更新
+      currentAccountType = extractAccountType(firstCell);
+      lookingForData = true;
+      continue;
+    }
+
+    // 集計行をスキップ
+    if (isSummaryRow(firstCell)) {
+      continue;
+    }
+
+    // データヘッダー行を検出
+    if (isDataHeader(firstCell)) {
+      currentHeaders = fields;
+      lookingForData = true;
+      continue;
+    }
+
+    // データ行の処理（ヘッダー行が既に見つかっている場合）
+    if (lookingForData && currentHeaders.length > 0) {
+      // 銘柄コード形式かどうかをチェック（4桁の数字で始まる）
+      if (/^\d{4}\s/.test(firstCell)) {
+        // 行をCsvRowに変換
+        const row: CsvRow = {};
+        for (let j = 0; j < currentHeaders.length; j++) {
+          row[currentHeaders[j]] = fields[j] ?? '';
+        }
+
+        // 口座種別を追加
+        row['__account_type'] = currentAccountType;
+
+        // マッピング
+        try {
+          const holding = mapper(row);
+          holdings.push(holding);
+        } catch {
+          errors.push({
+            lineNumber: i + 1,
+            message: 'データの変換に失敗しました',
+          });
+        }
+      }
     }
   }
 

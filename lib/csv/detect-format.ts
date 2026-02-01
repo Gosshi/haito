@@ -18,7 +18,7 @@ export function detectFormat(content: string): DetectedFormat {
   const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = normalizedContent.split('\n');
 
-  // 最初の有効な行を探索（空行をスキップ）
+  // 各行を探索してフォーマットを判定
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (trimmedLine === '') {
@@ -28,12 +28,12 @@ export function detectFormat(content: string): DetectedFormat {
     // SBI証券のセクションヘッダー行を検出
     if (isSectionHeader(trimmedLine)) {
       // セクションヘッダーが見つかった場合、SBIフォーマットの可能性が高い
-      // 後続の行でデータヘッダーを確認
+      // 後続の行でデータヘッダーを確認するためcontinue
       continue;
     }
 
     // SBI証券のデータヘッダー行を検出
-    const firstCell = trimmedLine.split(',')[0];
+    const firstCell = trimmedLine.split(',')[0].replace(/^"/, '').replace(/"$/, '');
     if (isDataHeader(firstCell)) {
       return 'sbi';
     }
@@ -48,8 +48,8 @@ export function detectFormat(content: string): DetectedFormat {
       return 'generic';
     }
 
-    // 最初の有効な行がいずれにも一致しない場合はunknown
-    return 'unknown';
+    // この行はフォーマット判定に使用できない（タイトル行など）ので次へ
+    // 最大20行まで探索
   }
 
   return 'unknown';
