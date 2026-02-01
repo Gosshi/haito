@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { getMapper, getExpectedHeaders } from './index';
 import { GENERIC_HEADERS, mapToHolding } from './generic';
 import { SBI_HEADERS, mapToHolding as sbiMapToHolding } from './sbi';
+import { RAKUTEN_HEADERS, mapToHolding as rakutenMapToHolding } from './rakuten';
 
 describe('formats registry', () => {
   describe('getMapper', () => {
@@ -15,8 +16,9 @@ describe('formats registry', () => {
       expect(mapper).toBe(sbiMapToHolding);
     });
 
-    it('rakutenフォーマットでエラーをスローする', () => {
-      expect(() => getMapper('rakuten')).toThrow("フォーマット 'rakuten' は未実装です。");
+    it('rakutenフォーマットでマッパー関数を返す', () => {
+      const mapper = getMapper('rakuten');
+      expect(mapper).toBe(rakutenMapToHolding);
     });
   });
 
@@ -31,8 +33,25 @@ describe('formats registry', () => {
       expect(headers).toBe(SBI_HEADERS);
     });
 
-    it('rakutenフォーマットでエラーをスローする', () => {
-      expect(() => getExpectedHeaders('rakuten')).toThrow("フォーマット 'rakuten' は未実装です。");
+    it('rakutenフォーマットで期待ヘッダーを返す', () => {
+      const headers = getExpectedHeaders('rakuten');
+      expect(headers).toBe(RAKUTEN_HEADERS);
+    });
+  });
+
+  describe('既存フォーマットへの影響なし', () => {
+    it('rakuten追加後もgenericは正常に動作する', () => {
+      const genericMapper = getMapper('generic');
+      const genericHeaders = getExpectedHeaders('generic');
+      expect(genericMapper).toBeDefined();
+      expect(genericHeaders).toContain('銘柄コード');
+    });
+
+    it('rakuten追加後もsbiは正常に動作する', () => {
+      const sbiMapper = getMapper('sbi');
+      const sbiHeaders = getExpectedHeaders('sbi');
+      expect(sbiMapper).toBeDefined();
+      expect(sbiHeaders).toContain('銘柄（コード）');
     });
   });
 });

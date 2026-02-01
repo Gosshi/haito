@@ -141,6 +141,11 @@ export function parseCsv(content: string, format: CsvFormat): CsvParseResult {
     return parseSbiCsv(content);
   }
 
+  // 楽天証券フォーマットはバリデーションなしでマッピング
+  if (format === 'rakuten') {
+    return parseRakutenCsv(content);
+  }
+
   return parseGenericCsv(content, format);
 }
 
@@ -292,6 +297,66 @@ function parseSbiCsv(content: string): CsvParseResult {
           });
         }
       }
+    }
+  }
+
+  return { holdings, errors };
+}
+
+/**
+ * 楽天証券CSVフォーマットをパースする
+ * バリデーションなしで直接マッピングする
+ */
+function parseRakutenCsv(content: string): CsvParseResult {
+  const holdings: CsvParseResult['holdings'] = [];
+  const errors: CsvValidationError[] = [];
+
+  // BOM除去
+  const cleanContent = removeBom(content);
+
+  // 行分割（ダブルクォート内改行対応）
+  const lines = splitLines(cleanContent);
+
+  // 空行をスキップしてフィルタリング
+  const nonEmptyLines = lines.filter((line) => line.trim() !== '');
+
+  if (nonEmptyLines.length === 0) {
+    return { holdings, errors };
+  }
+
+  // ヘッダー行を取得
+  const headerLine = nonEmptyLines[0];
+  const headers = parseFields(headerLine);
+
+  // マッパーを取得
+  const mapper = getMapper('rakuten');
+
+  // データ行を処理
+  for (let i = 1; i < nonEmptyLines.length; i++) {
+    const line = nonEmptyLines[i];
+    const values = parseFields(line);
+    const firstCell = values[0];
+
+    // 銘柄コード形式かどうかをチェック（4桁の数字で始まる）
+    if (!/^\d{4}\s/.test(firstCell)) {
+      continue;
+    }
+
+    // 行をCsvRowに変換
+    const row: CsvRow = {};
+    for (let j = 0; j < headers.length; j++) {
+      row[headers[j]] = values[j] ?? '';
+    }
+
+    // マッピング
+    try {
+      const holding = mapper(row);
+      holdings.push(holding);
+    } catch {
+      errors.push({
+        lineNumber: i + 1,
+        message: 'データの変換に失敗しました',
+      });
     }
   }
 
