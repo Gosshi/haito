@@ -6,6 +6,7 @@ import { useState, useCallback, useEffect } from 'react';
 
 import { DuplicateStrategySelect } from '../../../components/csv/duplicate-strategy-select';
 import { FileUpload } from '../../../components/csv/file-upload';
+import { FormatBadge } from '../../../components/csv/format-badge';
 import { ImportSummary } from '../../../components/csv/import-summary';
 import { PreviewTable } from '../../../components/csv/preview-table';
 import { Button } from '../../../components/ui/button';
@@ -19,8 +20,9 @@ import {
 import { Toaster } from '../../../components/ui/toaster';
 import type { DuplicateStrategy, BulkImportResponse, DuplicateInfo } from '../../../lib/api/holdings-bulk';
 import { checkDuplicates } from '../../../lib/api/holdings-bulk';
+import type { DetectedFormat } from '../../../lib/csv/detect-format';
 import { parseCsv } from '../../../lib/csv/parser';
-import type { CsvParseResult } from '../../../lib/csv/types';
+import type { CsvFormat, CsvParseResult } from '../../../lib/csv/types';
 import type { Holding } from '../../../lib/holdings/types';
 import { pushToast } from '../../../stores/toast-store';
 
@@ -38,6 +40,8 @@ export default function ImportPage() {
   const [duplicateStrategy, setDuplicateStrategy] = useState<DuplicateStrategy>('skip');
   const [isImporting, setIsImporting] = useState(false);
   const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
+  const [detectedFormat, setDetectedFormat] = useState<DetectedFormat | null>(null);
+  const [csvContent, setCsvContent] = useState<string | null>(null);
 
   // Fetch existing holdings and check for duplicates when parseResult changes
   useEffect(() => {
@@ -66,17 +70,32 @@ export default function ImportPage() {
     checkForDuplicates();
   }, [parseResult]);
 
+  const handleFormatDetected = useCallback((format: DetectedFormat) => {
+    setDetectedFormat(format);
+  }, []);
+
   const handleFileLoad = useCallback((content: string) => {
     setIsLoading(true);
+    setCsvContent(content);
+  }, []);
+
+  // Parse CSV when both content and format are available
+  useEffect(() => {
+    if (!csvContent || !detectedFormat) {
+      return;
+    }
+
     try {
-      const result = parseCsv(content, 'generic');
+      // Convert DetectedFormat to CsvFormat for parsing (unknown -> generic)
+      const format: CsvFormat = detectedFormat === 'unknown' ? 'generic' : detectedFormat;
+      const result = parseCsv(csvContent, format);
       setParseResult(result);
     } catch {
       pushToast('ファイルの読み込みに失敗しました', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [csvContent, detectedFormat]);
 
   const handleImport = useCallback(async () => {
     if (!parseResult || parseResult.holdings.length === 0) {
@@ -143,8 +162,17 @@ export default function ImportPage() {
             インポートするCSVファイルを選択してください。
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <FileUpload onFileLoad={handleFileLoad} isLoading={isLoading} />
+        <CardContent className="space-y-4">
+          <FileUpload
+            onFileLoad={handleFileLoad}
+            onFormatDetected={handleFormatDetected}
+            isLoading={isLoading}
+          />
+          {detectedFormat && (
+            <div className="flex justify-center">
+              <FormatBadge format={detectedFormat} />
+            </div>
+          )}
         </CardContent>
       </Card>
 

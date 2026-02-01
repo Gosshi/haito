@@ -22,22 +22,37 @@ vi.mock('../../../stores/toast-store', () => ({
   useToastStore: vi.fn(() => []),
 }));
 
+// FileUploadコンポーネントのモック
+let mockOnFormatDetected: ((format: 'generic' | 'sbi' | 'rakuten' | 'unknown') => void) | undefined;
+let mockOnFileLoad: ((content: string) => void) | undefined;
+vi.mock('../../../components/csv/file-upload', () => ({
+  FileUpload: ({ onFileLoad, onFormatDetected }: {
+    onFileLoad: (content: string) => void;
+    onFormatDetected?: (format: 'generic' | 'sbi' | 'rakuten' | 'unknown') => void;
+  }) => {
+    // コールバックを保存して後で呼び出せるようにする
+    mockOnFormatDetected = onFormatDetected;
+    mockOnFileLoad = onFileLoad;
+    return (
+      <div data-testid="file-upload">
+        <button
+          type="button"
+          onClick={() => {
+            if (onFormatDetected) onFormatDetected('generic');
+            onFileLoad('銘柄コード,銘柄名,保有株数\n8306,三菱UFJ,100');
+          }}
+        >
+          ファイルを選択
+        </button>
+      </div>
+    );
+  },
+}));
+
 // fetch モック
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// FileReader モック
-class MockFileReader {
-  onload: ((event: { target: { result: string } }) => void) | null = null;
-  readAsText() {
-    setTimeout(() => {
-      if (this.onload) {
-        this.onload({ target: { result: 'mock csv content' } });
-      }
-    }, 0);
-  }
-}
-global.FileReader = MockFileReader as unknown as typeof FileReader;
 
 describe('ImportPage', () => {
   const mockRouter = {
@@ -52,13 +67,12 @@ describe('ImportPage', () => {
 
   // ファイルアップロードをシミュレートするヘルパー関数
   const uploadFile = async () => {
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['mock csv content'], 'test.csv', { type: 'text/csv' });
+    const button = screen.getByRole('button', { name: 'ファイルを選択' });
 
     await act(async () => {
-      fireEvent.change(input, { target: { files: [file] } });
-      // FileReaderの非同期処理を待つ
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      fireEvent.click(button);
+      // Reactの再レンダリングを待つ
+      await new Promise((resolve) => setTimeout(resolve, 50));
     });
   };
 
@@ -489,6 +503,45 @@ describe('ImportPage', () => {
           'インポートに失敗しました: Network error',
           'error'
         );
+      });
+    });
+  });
+
+  describe('5.3 フォーマットバッジをインポート画面に統合する', () => {
+    it('ファイルアップロード後にフォーマットバッジが表示される', async () => {
+      (parseCsv as Mock).mockReturnValue({
+        holdings: [
+          {
+            stock_code: '8306',
+            stock_name: '三菱UFJ',
+            shares: 100,
+            account_type: 'specific',
+          },
+        ],
+        errors: [],
+      });
+
+      mockFetch.mockImplementation((url: string) => {
+        if (url === '/api/holdings') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([]),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, imported: 1, skipped: 0, errors: [] }),
+        });
+      });
+
+      render(<ImportPage />);
+
+      // ファイルをアップロード
+      await uploadFile();
+
+      // フォーマットバッジが表示されることを確認
+      await waitFor(() => {
+        expect(screen.getByText('汎用フォーマットを検出しました')).toBeInTheDocument();
       });
     });
   });

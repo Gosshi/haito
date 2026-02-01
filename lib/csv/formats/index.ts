@@ -1,5 +1,6 @@
 import type { CsvFormat, CsvMapper } from '../types';
 import { GENERIC_HEADERS, mapToHolding } from './generic';
+import { SBI_HEADERS, mapToHolding as sbiMapToHolding } from './sbi';
 
 /**
  * フォーマット種別に対応するマッパー関数を取得
@@ -12,7 +13,7 @@ export function getMapper(format: CsvFormat): CsvMapper {
     case 'generic':
       return mapToHolding;
     case 'sbi':
-      throw new Error("フォーマット 'sbi' は未実装です。");
+      return sbiMapToHolding;
     case 'rakuten':
       throw new Error("フォーマット 'rakuten' は未実装です。");
   }
@@ -29,7 +30,7 @@ export function getExpectedHeaders(format: CsvFormat): readonly string[] {
     case 'generic':
       return GENERIC_HEADERS;
     case 'sbi':
-      throw new Error("フォーマット 'sbi' は未実装です。");
+      return SBI_HEADERS;
     case 'rakuten':
       throw new Error("フォーマット 'rakuten' は未実装です。");
   }
