@@ -1,4 +1,5 @@
 import { GENERIC_HEADERS } from './formats/generic';
+import { isRakutenHeader } from './formats/rakuten';
 import { SBI_HEADERS, isSectionHeader, isDataHeader } from './formats/sbi';
 
 /** 検出結果のフォーマット種別（unknownを含む） */
@@ -41,6 +42,11 @@ export function detectFormat(content: string): DetectedFormat {
     // SBI証券のヘッダーパターンをチェック
     if (trimmedLine.includes(SBI_HEADERS[0])) {
       return 'sbi';
+    }
+
+    // 楽天証券のヘッダーパターンをチェック（SBIの後、genericの前）
+    if (isRakutenHeader(trimmedLine)) {
+      return 'rakuten';
     }
 
     // 汎用フォーマットのヘッダーパターンをチェック
