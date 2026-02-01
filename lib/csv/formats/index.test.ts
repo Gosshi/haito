@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getMapper, getExpectedHeaders } from './index';
 import { GENERIC_HEADERS, mapToHolding } from './generic';
+import { SBI_HEADERS, mapToHolding as sbiMapToHolding } from './sbi';
 
 describe('formats registry', () => {
   describe('getMapper', () => {
@@ -9,8 +10,9 @@ describe('formats registry', () => {
       expect(mapper).toBe(mapToHolding);
     });
 
-    it('sbiフォーマットでエラーをスローする', () => {
-      expect(() => getMapper('sbi')).toThrow("フォーマット 'sbi' は未実装です。");
+    it('sbiフォーマットでマッパー関数を返す', () => {
+      const mapper = getMapper('sbi');
+      expect(mapper).toBe(sbiMapToHolding);
     });
 
     it('rakutenフォーマットでエラーをスローする', () => {
@@ -24,8 +26,9 @@ describe('formats registry', () => {
       expect(headers).toBe(GENERIC_HEADERS);
     });
 
-    it('sbiフォーマットでエラーをスローする', () => {
-      expect(() => getExpectedHeaders('sbi')).toThrow("フォーマット 'sbi' は未実装です。");
+    it('sbiフォーマットで期待ヘッダーを返す', () => {
+      const headers = getExpectedHeaders('sbi');
+      expect(headers).toBe(SBI_HEADERS);
     });
 
     it('rakutenフォーマットでエラーをスローする', () => {
