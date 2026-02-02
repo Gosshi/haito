@@ -8,14 +8,14 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 
-interface FormErrors {
+export interface FormErrors {
   annualDividendGoal?: string;
   goalDeadlineYear?: string;
 }
 
-const getCurrentYear = () => new Date().getFullYear();
+export const getCurrentYear = () => new Date().getFullYear();
 
-const validateGoalSettings = (
+export const validateGoalSettings = (
   annualDividendGoal: string,
   goalDeadlineYear: string
 ): FormErrors => {
