@@ -45,6 +45,9 @@ export default async function DashboardPage() {
         <Link className="text-primary hover:underline" href="/calendar">
           カレンダーへ
         </Link>
+        <Link className="text-primary hover:underline" href="/settings">
+          設定へ
+        </Link>
       </div>
       {!hasHoldings && (
         <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
