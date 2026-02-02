@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { LogoutButton } from '../../components/auth/logout-button';
 import { AccountBreakdown } from '../../components/dashboard/account-breakdown';
+import { GoalProgressWidget } from '../../components/dashboard/goal-progress-widget';
 import { SummaryCard } from '../../components/dashboard/summary-card';
 import { fetchDashboardData } from '../../lib/api/dashboard';
 import { calculateDividendSummary } from '../../lib/calculations/dividend';
@@ -49,6 +50,7 @@ export default async function DashboardPage() {
           設定へ
         </Link>
       </div>
+      <GoalProgressWidget currentAnnualDividend={summary?.totalPreTax ?? 0} />
       {!hasHoldings && (
         <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
           銘柄を登録してください
