@@ -13,6 +13,12 @@ export type DividendGoalRequest = {
   assumptions: DividendGoalAssumptions;
 };
 
+export type DividendGoalScenarioCompareRequest = {
+  target_annual_dividend: number;
+  monthly_contribution: number;
+  horizon_years: number;
+};
+
 export type DividendGoalSnapshot = {
   current_annual_dividend?: number | null;
   current_yield_rate?: number | null;
@@ -38,6 +44,18 @@ export type DividendGoalResponse = {
   result?: DividendGoalResult | null;
   series?: DividendGoalSeriesPoint[];
   recommendations?: DividendGoalRecommendation[];
+};
+
+export type DividendGoalScenario = {
+  scenario_id: string;
+  name: string;
+  assumptions: DividendGoalAssumptions;
+  result: DividendGoalResult;
+  series: DividendGoalSeriesPoint[];
+};
+
+export type DividendGoalScenarioCompareResponse = {
+  scenarios: DividendGoalScenario[];
 };
 
 export type SimulationErrorResponse = {
