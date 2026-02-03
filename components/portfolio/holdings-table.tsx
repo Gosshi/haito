@@ -82,6 +82,16 @@ const compareNullableNumber = (
   return direction === 'asc' ? left - right : right - left;
 };
 
+const annualDividendSortValue = (
+  holding: PortfolioHoldingView
+): number | null => {
+  if (holding.annualDividend === null || !Number.isFinite(holding.annualDividend)) {
+    return null;
+  }
+
+  return holding.annualDividendAmount;
+};
+
 const sortHoldings = (
   holdings: PortfolioHoldingView[],
   option: SortOption
@@ -107,11 +117,19 @@ const sortHoldings = (
         return diff !== 0 ? diff : a.index - b.index;
       }
       case 'annual_dividend_desc': {
-        const diff = b.holding.annualDividendAmount - a.holding.annualDividendAmount;
+        const diff = compareNullableNumber(
+          annualDividendSortValue(a.holding),
+          annualDividendSortValue(b.holding),
+          'desc'
+        );
         return diff !== 0 ? diff : a.index - b.index;
       }
       case 'annual_dividend_asc': {
-        const diff = a.holding.annualDividendAmount - b.holding.annualDividendAmount;
+        const diff = compareNullableNumber(
+          annualDividendSortValue(a.holding),
+          annualDividendSortValue(b.holding),
+          'asc'
+        );
         return diff !== 0 ? diff : a.index - b.index;
       }
       case 'stock_code_asc':

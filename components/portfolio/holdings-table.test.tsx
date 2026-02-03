@@ -149,4 +149,24 @@ describe('HoldingsTable', () => {
     expect(secondRowCells[0]).toHaveTextContent('7203');
     expect(fetchDividendLookups).toHaveBeenCalledTimes(1);
   });
+
+  it('年間配当額ソートで配当未取得の銘柄を末尾にする', async () => {
+    render(<HoldingsTable />);
+
+    await waitFor(() => {
+      expect(fetchDividendLookups).toHaveBeenCalledTimes(1);
+    });
+
+    const select = screen.getByLabelText('並べ替え');
+    fireEvent.change(select, { target: { value: 'annual_dividend_asc' } });
+
+    const rows = screen.getAllByRole('row').slice(1);
+    const firstRowCells = within(rows[0]).getAllByRole('cell');
+    const secondRowCells = within(rows[1]).getAllByRole('cell');
+    const thirdRowCells = within(rows[2]).getAllByRole('cell');
+
+    expect(firstRowCells[0]).toHaveTextContent('8306');
+    expect(secondRowCells[0]).toHaveTextContent('7203');
+    expect(thirdRowCells[0]).toHaveTextContent('9999');
+  });
 });
