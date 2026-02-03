@@ -1,0 +1,53 @@
+export type TaxMode = 'pretax' | 'after_tax';
+
+export type DividendGoalAssumptions = {
+  yield_rate: number;
+  dividend_growth_rate: number;
+  tax_mode: TaxMode;
+};
+
+export type DividendGoalRequest = {
+  target_annual_dividend: number;
+  monthly_contribution: number;
+  horizon_years: number;
+  assumptions: DividendGoalAssumptions;
+};
+
+export type DividendGoalSnapshot = {
+  current_annual_dividend?: number | null;
+  current_yield_rate?: number | null;
+};
+
+export type DividendGoalSeriesPoint = {
+  year: number;
+  annual_dividend: number;
+};
+
+export type DividendGoalResult = {
+  achieved?: boolean;
+  achieved_in_year?: number | null;
+  gap_now?: number | null;
+  end_annual_dividend?: number | null;
+  target_annual_dividend?: number | null;
+};
+
+export type DividendGoalRecommendation = Record<string, unknown>;
+
+export type DividendGoalResponse = {
+  snapshot?: DividendGoalSnapshot | null;
+  result?: DividendGoalResult | null;
+  series?: DividendGoalSeriesPoint[];
+  recommendations?: DividendGoalRecommendation[];
+};
+
+export type SimulationErrorResponse = {
+  error: {
+    code: string;
+    message: string;
+    details: unknown | null;
+  };
+};
+
+export type SimulationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: SimulationErrorResponse };
