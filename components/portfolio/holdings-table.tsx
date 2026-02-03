@@ -2,9 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { AccountType, Holding } from '../../lib/holdings/types';
+import { fetchDividendLookups } from '../../lib/api/dividend-lookups';
+import {
+  calculateHoldingYield,
+  calculatePortfolioYield,
+} from '../../lib/calculations/portfolio-yield';
+import { formatPercent } from '../../lib/portfolio/format';
 import { useHoldingsStore } from '../../stores/holdings-store';
 import { Button } from '../ui/button';
 import {
@@ -24,7 +30,9 @@ import {
 } from '../ui/table';
 import { DeleteHoldingDialog } from './delete-holding-dialog';
 import { EditHoldingDialog } from './edit-holding-dialog';
+import { PortfolioSummary } from './portfolio-summary';
 import { RefreshDividendsButton } from './refresh-dividends-button';
+import { SortDropdown, type SortOption } from './sort-dropdown';
 
 const accountTypeLabels: Record<AccountType, string> = {
   specific: '特定口座',
@@ -44,16 +52,184 @@ const formatAcquisitionPrice = (value: number | null): string =>
 const renderStockName = (value: Holding['stock_name']): string =>
   value && value.trim().length > 0 ? value : '-';
 
+type PortfolioHoldingView = Holding & {
+  annualDividend: number | null;
+  annualDividendAmount: number;
+  investmentAmount: number;
+  yieldPercent: number | null;
+};
+
+const compareNullableNumber = (
+  left: number | null,
+  right: number | null,
+  direction: 'asc' | 'desc'
+): number => {
+  const leftNull = left === null || !Number.isFinite(left);
+  const rightNull = right === null || !Number.isFinite(right);
+
+  if (leftNull && rightNull) {
+    return 0;
+  }
+
+  if (leftNull) {
+    return 1;
+  }
+
+  if (rightNull) {
+    return -1;
+  }
+
+  return direction === 'asc' ? left - right : right - left;
+};
+
+const annualDividendSortValue = (
+  holding: PortfolioHoldingView
+): number | null => {
+  if (holding.annualDividend === null || !Number.isFinite(holding.annualDividend)) {
+    return null;
+  }
+
+  return holding.annualDividendAmount;
+};
+
+const sortHoldings = (
+  holdings: PortfolioHoldingView[],
+  option: SortOption
+): PortfolioHoldingView[] => {
+  const indexed = holdings.map((holding, index) => ({ holding, index }));
+
+  indexed.sort((a, b) => {
+    switch (option) {
+      case 'yield_desc': {
+        const diff = compareNullableNumber(
+          a.holding.yieldPercent,
+          b.holding.yieldPercent,
+          'desc'
+        );
+        return diff !== 0 ? diff : a.index - b.index;
+      }
+      case 'yield_asc': {
+        const diff = compareNullableNumber(
+          a.holding.yieldPercent,
+          b.holding.yieldPercent,
+          'asc'
+        );
+        return diff !== 0 ? diff : a.index - b.index;
+      }
+      case 'annual_dividend_desc': {
+        const diff = compareNullableNumber(
+          annualDividendSortValue(a.holding),
+          annualDividendSortValue(b.holding),
+          'desc'
+        );
+        return diff !== 0 ? diff : a.index - b.index;
+      }
+      case 'annual_dividend_asc': {
+        const diff = compareNullableNumber(
+          annualDividendSortValue(a.holding),
+          annualDividendSortValue(b.holding),
+          'asc'
+        );
+        return diff !== 0 ? diff : a.index - b.index;
+      }
+      case 'stock_code_asc':
+      default: {
+        const diff = a.holding.stock_code.localeCompare(b.holding.stock_code);
+        return diff !== 0 ? diff : a.index - b.index;
+      }
+    }
+  });
+
+  return indexed.map(({ holding }) => holding);
+};
+
 export function HoldingsTable() {
   const router = useRouter();
   const holdings = useHoldingsStore((state) => state.holdings);
   const isLoading = useHoldingsStore((state) => state.isLoading);
   const error = useHoldingsStore((state) => state.error);
   const fetchHoldings = useHoldingsStore((state) => state.fetchHoldings);
+  const [sortOption, setSortOption] = useState<SortOption>('yield_desc');
+  const [dividendMap, setDividendMap] = useState<Map<string, number | null>>(
+    () => new Map()
+  );
+  const [dividendError, setDividendError] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchHoldings();
   }, [fetchHoldings]);
+
+  useEffect(() => {
+    if (holdings.length === 0) {
+      setDividendMap(new Map());
+      setDividendError(null);
+      return;
+    }
+
+    let active = true;
+    const loadDividends = async () => {
+      const result = await fetchDividendLookups(
+        holdings.map((holding) => holding.stock_code)
+      );
+      if (!active) {
+        return;
+      }
+
+      if (!result.ok) {
+        setDividendError(result.error.message);
+        setDividendMap(new Map());
+        return;
+      }
+
+      const nextMap = new Map<string, number | null>();
+      result.data.forEach((row) => {
+        nextMap.set(row.stockCode, row.annualDividend ?? null);
+      });
+      setDividendMap(nextMap);
+      setDividendError(null);
+    };
+
+    void loadDividends();
+    return () => {
+      active = false;
+    };
+  }, [holdings]);
+
+  const portfolioHoldings = useMemo<PortfolioHoldingView[]>(() => {
+    return holdings.map((holding) => {
+      const annualDividend = dividendMap.get(holding.stock_code) ?? null;
+      const yieldResult = calculateHoldingYield({
+        stockCode: holding.stock_code,
+        shares: holding.shares,
+        acquisitionPrice: holding.acquisition_price,
+        annualDividend,
+      });
+
+      return {
+        ...holding,
+        annualDividend,
+        annualDividendAmount: yieldResult.annualDividendAmount,
+        investmentAmount: yieldResult.investmentAmount,
+        yieldPercent: yieldResult.yieldPercent,
+      };
+    });
+  }, [holdings, dividendMap]);
+
+  const portfolioSummary = useMemo(() => {
+    return calculatePortfolioYield(
+      portfolioHoldings.map((holding) => ({
+        stockCode: holding.stock_code,
+        shares: holding.shares,
+        acquisitionPrice: holding.acquisition_price,
+        annualDividend: holding.annualDividend,
+      }))
+    );
+  }, [portfolioHoldings]);
+
+  const sortedHoldings = useMemo(
+    () => sortHoldings(portfolioHoldings, sortOption),
+    [portfolioHoldings, sortOption]
+  );
 
   const handleAddHolding = () => {
     router.push('/portfolio/add');
@@ -83,6 +259,19 @@ export function HoldingsTable() {
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {dividendError && (
+          <p className="text-sm text-red-600">
+            配当データの取得に失敗しました: {dividendError}
+          </p>
+        )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <PortfolioSummary averageYield={portfolioSummary.averageYield} />
+          <SortDropdown
+            value={sortOption}
+            onChange={setSortOption}
+            showStatus={true}
+          />
+        </div>
         {isLoading && (
           <p className="text-sm text-muted-foreground">読み込み中...</p>
         )}
@@ -104,12 +293,13 @@ export function HoldingsTable() {
                 <TableHead>銘柄名</TableHead>
                 <TableHead className="text-right">保有株数</TableHead>
                 <TableHead className="text-right">取得単価</TableHead>
+                <TableHead className="text-right">配当利回り</TableHead>
                 <TableHead>口座種別</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {holdings.map((holding) => (
+              {sortedHoldings.map((holding) => (
                 <TableRow key={holding.id}>
                   <TableCell className="font-medium">
                     {holding.stock_code}
@@ -120,6 +310,9 @@ export function HoldingsTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     {formatAcquisitionPrice(holding.acquisition_price)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatPercent(holding.yieldPercent)}
                   </TableCell>
                   <TableCell>{formatAccountType(holding.account_type)}</TableCell>
                   <TableCell className="text-right">
