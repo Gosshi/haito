@@ -1,0 +1,106 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { runDividendGoalSimulation } from './simulations';
+import type { DividendGoalRequest, DividendGoalResponse } from '../simulations/types';
+
+describe('runDividendGoalSimulation', () => {
+  const mockRequest: DividendGoalRequest = {
+    target_annual_dividend: 1200000,
+    monthly_contribution: 30000,
+    horizon_years: 5,
+    assumptions: {
+      yield_rate: 3.5,
+      dividend_growth_rate: 2.0,
+      tax_mode: 'after_tax',
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('成功時にシミュレーション結果を返す', async () => {
+    const mockResponse: DividendGoalResponse = {
+      snapshot: { current_annual_dividend: 180000, current_yield_rate: 3.2 },
+      result: { achieved: false, achieved_in_year: null, gap_now: 300000 },
+      series: [{ year: 1, annual_dividend: 200000 }],
+    };
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(mockResponse),
+    } as Response);
+
+    const result = await runDividendGoalSimulation(mockRequest);
+
+    expect(result).toEqual({ ok: true, data: mockResponse });
+    expect(fetch).toHaveBeenCalledWith('/api/simulations/dividend-goal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mockRequest),
+    });
+  });
+
+  it('APIがエラーJSONを返した場合はエラー内容を保持する', async () => {
+    const errorResponse = {
+      error: {
+        code: 'BAD_REQUEST',
+        message: 'Invalid input',
+        details: { field: 'target_annual_dividend' },
+      },
+    };
+
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: () => Promise.resolve(errorResponse),
+    } as Response);
+
+    const result = await runDividendGoalSimulation(mockRequest);
+
+    expect(result).toEqual({ ok: false, error: errorResponse });
+  });
+
+  it('401時はUNAUTHORIZEDとして扱う', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: () => Promise.reject(new Error('invalid json')),
+    } as Response);
+
+    const result = await runDividendGoalSimulation(mockRequest);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required.',
+          details: null,
+        },
+      },
+    });
+  });
+
+  it('ネットワークエラー時はNETWORK_ERRORとして扱う', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network down'));
+
+    const result = await runDividendGoalSimulation(mockRequest);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network down',
+          details: null,
+        },
+      },
+    });
+  });
+});
