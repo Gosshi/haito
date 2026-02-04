@@ -25,12 +25,15 @@ type UserSettingsRow = {
   account_type: account_type | null;
 } & Record<string, unknown>;
 
+type RoadmapHistoriesRow = Record<string, unknown>;
+
 export type Database = {
   public: {
     Tables: {
       holdings: TableDefinition<HoldingsRow>;
       dividend_data: TableDefinition<DividendDataRow>;
       user_settings: TableDefinition<UserSettingsRow>;
+      roadmap_histories: TableDefinition<RoadmapHistoriesRow>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

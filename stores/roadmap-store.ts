@@ -8,6 +8,8 @@ import type {
   SimulationErrorResponse,
 } from '../lib/simulations/types';
 import { runRoadmapSimulation } from '../lib/simulations/roadmap';
+import { buildRoadmapHistoryCreateRequest } from '../lib/roadmap-history/build-request';
+import { useRoadmapHistoryStore } from './roadmap-history-store';
 
 export type RoadmapState = {
   input: DividendGoalRequest | null;
@@ -33,5 +35,10 @@ export const useRoadmapStore = create<RoadmapState>((set) => ({
     }
 
     set({ response: result.data, error: null, isLoading: false });
+
+    const historyPayload = buildRoadmapHistoryCreateRequest(input, result.data);
+    if (historyPayload) {
+      void useRoadmapHistoryStore.getState().saveHistory(historyPayload);
+    }
   },
 }));

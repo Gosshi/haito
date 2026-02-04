@@ -36,6 +36,11 @@ test('database types include required tables', () => {
     /user_settings/,
     'Database type must include user_settings table'
   );
+  assert.match(
+    content,
+    /roadmap_histories/,
+    'Database type must include roadmap_histories table'
+  );
 });
 
 test('database types include account_type enum', () => {
