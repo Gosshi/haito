@@ -10,6 +10,7 @@ import { RoadmapShockView } from '../../../components/roadmap/roadmap-shock-view
 import { RoadmapSummary } from '../../../components/roadmap/roadmap-summary';
 import { ScenarioCompareView } from '../../../components/roadmap/scenario-compare-view';
 import { Button } from '../../../components/ui/button';
+import { Toaster } from '../../../components/ui/toaster';
 import { useSettingsStore } from '../../../stores/settings-store';
 import { useRoadmapStore } from '../../../stores/roadmap-store';
 import { useScenarioCompareStore } from '../../../stores/scenario-compare-store';
@@ -113,6 +114,7 @@ export default function RoadmapPage() {
       ) : (
         <ScenarioCompareView />
       )}
+      <Toaster />
     </main>
   );
 }
