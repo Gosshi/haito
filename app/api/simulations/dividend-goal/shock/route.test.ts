@@ -96,16 +96,35 @@ describe('DividendGoalShockApi access control', () => {
       result: {
         achieved: false,
         achieved_in_year: null,
-        end_annual_dividend: 100000,
+        end_annual_dividend: 150000,
         target_annual_dividend: 120000,
       },
       series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
     };
 
-    mockRunSimulation.mockResolvedValue({
-      ok: true,
-      data: baseResponse,
-    });
+    const shockedResponse = {
+      snapshot: {
+        current_annual_dividend: 100000,
+        current_yield_rate: 3.2,
+      },
+      result: {
+        achieved: false,
+        achieved_in_year: 2028,
+        end_annual_dividend: 120000,
+        target_annual_dividend: 120000,
+      },
+      series: [{ year: new Date().getFullYear(), annual_dividend: 90000 }],
+    };
+
+    mockRunSimulation
+      .mockResolvedValueOnce({
+        ok: true,
+        data: baseResponse,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: shockedResponse,
+      });
 
     const response = await POST(
       new Request('http://localhost/api/simulations/dividend-goal/shock', {
@@ -115,8 +134,22 @@ describe('DividendGoalShockApi access control', () => {
     );
 
     expect(response.status).toBe(200);
-    const json = (await response.json()) as { base?: unknown };
+    const json = (await response.json()) as {
+      base?: unknown;
+      shocked?: unknown;
+      delta?: unknown;
+    };
     expect(json.base).toEqual(baseResponse);
+    expect(json.shocked).toEqual(shockedResponse);
+    expect(json.delta).toEqual({
+      achieved_year_delay: null,
+      end_annual_dividend_gap: 30000,
+    });
+
+    expect(mockRunSimulation).toHaveBeenCalledTimes(2);
+    expect(mockRunSimulation.mock.calls[1]?.[1]).toEqual({
+      shock: validRequestBody.shock,
+    });
   });
 
   it('再投資率が範囲外の場合は400を返す', async () => {

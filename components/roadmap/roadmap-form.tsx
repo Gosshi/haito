@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type {
+  AccountType,
   DividendGoalRequest,
   DividendGoalSnapshot,
   TaxMode,
 } from '../../lib/simulations/types';
 import type { UserSettings } from '../../lib/settings/types';
 import { formatCurrencyJPY } from '../../lib/dashboard/format';
+import { useFeatureAccessStore } from '../../stores/feature-access-store';
 import { useSettingsStore } from '../../stores/settings-store';
 import { useRoadmapStore } from '../../stores/roadmap-store';
 import { Button } from '../ui/button';
@@ -23,6 +25,8 @@ type RoadmapFormValues = {
   horizonYears: string;
   yieldRate: string;
   dividendGrowthRate: string;
+  reinvestRate: string;
+  accountType: AccountType;
   taxMode: TaxMode;
 };
 
@@ -32,15 +36,21 @@ type SliderConfig = {
   step: number;
 };
 
-const sliderConfigs: Record<
-  Exclude<keyof RoadmapFormValues, 'taxMode'>,
-  SliderConfig
-> = {
+type SliderField =
+  | 'targetAnnualDividend'
+  | 'monthlyContribution'
+  | 'horizonYears'
+  | 'yieldRate'
+  | 'dividendGrowthRate'
+  | 'reinvestRate';
+
+const sliderConfigs: Record<SliderField, SliderConfig> = {
   targetAnnualDividend: { min: 0, max: 5000000, step: 10000 },
   monthlyContribution: { min: 0, max: 200000, step: 1000 },
   horizonYears: { min: 0, max: 40, step: 1 },
   yieldRate: { min: 0, max: 10, step: 0.1 },
   dividendGrowthRate: { min: 0, max: 10, step: 0.1 },
+  reinvestRate: { min: 0, max: 1, step: 0.05 },
 };
 
 const getCurrentYear = () => new Date().getFullYear();
@@ -92,6 +102,8 @@ const buildInitialValues = (
     horizonYears: stringifyNumber(horizonYears),
     yieldRate: stringifyNumber(yieldRate),
     dividendGrowthRate: '',
+    reinvestRate: stringifyNumber(1),
+    accountType: 'nisa',
     taxMode: 'after_tax',
   };
 };
@@ -110,13 +122,15 @@ const buildRequest = (values: RoadmapFormValues): DividendGoalRequest | null => 
   const horizonYears = parseNumber(values.horizonYears);
   const yieldRate = parseNumber(values.yieldRate);
   const dividendGrowthRate = parseNumber(values.dividendGrowthRate);
+  const reinvestRate = parseNumber(values.reinvestRate);
 
   if (
     targetAnnualDividend === null ||
     monthlyContribution === null ||
     horizonYears === null ||
     yieldRate === null ||
-    dividendGrowthRate === null
+    dividendGrowthRate === null ||
+    reinvestRate === null
   ) {
     return null;
   }
@@ -128,6 +142,8 @@ const buildRequest = (values: RoadmapFormValues): DividendGoalRequest | null => 
     assumptions: {
       yield_rate: yieldRate,
       dividend_growth_rate: dividendGrowthRate,
+      reinvest_rate: reinvestRate,
+      account_type: values.accountType,
       tax_mode: values.taxMode,
     },
   };
@@ -138,12 +154,16 @@ export function RoadmapForm() {
   const response = useRoadmapStore((state) => state.response);
   const runRoadmap = useRoadmapStore((state) => state.runRoadmap);
   const isLoading = useRoadmapStore((state) => state.isLoading);
+  const billingStatus = useFeatureAccessStore((state) => state.status);
+  const refreshStatus = useFeatureAccessStore((state) => state.refreshStatus);
 
   const snapshot = response?.snapshot ?? null;
   const [values, setValues] = useState<RoadmapFormValues>(() =>
     buildInitialValues(settings, snapshot, getCurrentYear())
   );
   const [isDirty, setIsDirty] = useState(false);
+  const isPremium = billingStatus?.plan === 'premium' && billingStatus.is_active;
+  const isLocked = !isPremium;
 
   useEffect(() => {
     if (isDirty) {
@@ -151,6 +171,21 @@ export function RoadmapForm() {
     }
     setValues(buildInitialValues(settings, snapshot, getCurrentYear()));
   }, [settings, snapshot, isDirty]);
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    if (!isLocked) {
+      return;
+    }
+    setValues((prev) => ({
+      ...prev,
+      reinvestRate: stringifyNumber(1),
+      accountType: 'nisa',
+    }));
+  }, [isLocked]);
 
   const request = useMemo(() => buildRequest(values), [values]);
   const isReady = request !== null;
@@ -300,8 +335,60 @@ export function RoadmapForm() {
             />
           </div>
 
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold">再投資（配当の使い道）</h3>
+            <div className="space-y-2">
+              <Label htmlFor="reinvestRate">再投資率（0.0〜1.0）</Label>
+              <Input
+                id="reinvestRate"
+                type="number"
+                min={sliderConfigs.reinvestRate.min}
+                max={sliderConfigs.reinvestRate.max}
+                step={sliderConfigs.reinvestRate.step}
+                value={values.reinvestRate}
+                onChange={handleFieldChange('reinvestRate')}
+                disabled={isLocked}
+                placeholder="例: 1.0"
+              />
+              <input
+                aria-label="再投資率スライダー"
+                type="range"
+                min={sliderConfigs.reinvestRate.min}
+                max={sliderConfigs.reinvestRate.max}
+                step={sliderConfigs.reinvestRate.step}
+                value={resolveSliderValue(values.reinvestRate, sliderConfigs.reinvestRate)}
+                onChange={handleFieldChange('reinvestRate')}
+                className="w-full"
+                disabled={isLocked}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accountType">税区分（NISA/課税）</Label>
+              <Select
+                id="accountType"
+                value={values.accountType}
+                onChange={handleFieldChange('accountType')}
+                disabled={isLocked}
+              >
+                <SelectItem value="nisa">NISA</SelectItem>
+                <SelectItem value="taxable">課税</SelectItem>
+              </Select>
+            </div>
+
+            {isLocked && (
+              <p className="text-xs text-muted-foreground">
+                Freeでは再投資は100%・税区分はNISA固定で試算します
+              </p>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              税率は簡易的に固定値で計算しています。入力前提に基づく試算です。
+            </p>
+          </section>
+
           <div className="space-y-2">
-            <Label htmlFor="taxMode">税区分</Label>
+            <Label htmlFor="taxMode">税モード</Label>
             <Select
               id="taxMode"
               value={values.taxMode}

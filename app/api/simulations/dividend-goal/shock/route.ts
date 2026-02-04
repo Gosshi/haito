@@ -5,7 +5,6 @@ import { createClient } from '../../../../../lib/supabase/server';
 import { runDividendGoalSimulation } from '../../../../../lib/simulations/dividend-goal-sim';
 import type {
   DividendGoalResponse,
-  DividendGoalSeriesPoint,
   DividendGoalShockRequest,
   DividendGoalShockResponse,
   SimulationErrorResponse,
@@ -41,49 +40,6 @@ const validateRequest = (
   }
 
   return { ok: true, value: request };
-};
-
-const applyShockToSeries = (
-  series: DividendGoalSeriesPoint[],
-  shockYear: number,
-  shockRate: number
-): DividendGoalSeriesPoint[] => {
-  const multiplier = Math.max(0, 1 - shockRate / 100);
-  return series.map((point) => {
-    if (point.year < shockYear) {
-      return point;
-    }
-    return {
-      ...point,
-      annual_dividend: Math.round(point.annual_dividend * multiplier),
-    };
-  });
-};
-
-const buildResponseFromSeries = (
-  series: DividendGoalSeriesPoint[],
-  input: DividendGoalShockRequest,
-  base: DividendGoalResponse
-): DividendGoalResponse => {
-  const target = input.target_annual_dividend;
-  const achievedPoint = series.find((point) => point.annual_dividend >= target);
-  const endAnnualDividend = series.at(-1)?.annual_dividend ?? null;
-  const currentAnnualDividend =
-    typeof base.snapshot?.current_annual_dividend === 'number'
-      ? base.snapshot.current_annual_dividend
-      : 0;
-
-  return {
-    snapshot: base.snapshot ?? null,
-    result: {
-      achieved: Boolean(achievedPoint),
-      achieved_in_year: achievedPoint?.year ?? null,
-      gap_now: Math.max(0, target - Math.max(0, currentAnnualDividend)),
-      end_annual_dividend: endAnnualDividend,
-      target_annual_dividend: target,
-    },
-    series,
-  };
 };
 
 const buildDelta = (
@@ -162,13 +118,19 @@ export async function POST(
     );
   }
 
+  const shockedResult = await runDividendGoalSimulation(input, {
+    shock: input.shock,
+  });
+
+  if (!shockedResult.ok) {
+    return NextResponse.json(
+      buildErrorResponse('INTERNAL_ERROR', 'Simulation failed.'),
+      { status: 500 }
+    );
+  }
+
   const base = baseResult.data;
-  const shockedSeries = applyShockToSeries(
-    base.series ?? [],
-    input.shock.year,
-    input.shock.rate
-  );
-  const shocked = buildResponseFromSeries(shockedSeries, input, base);
+  const { recommendations: _recommendations, ...shocked } = shockedResult.data;
   const delta = buildDelta(base, shocked);
 
   return NextResponse.json({

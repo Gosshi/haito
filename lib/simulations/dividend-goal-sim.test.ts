@@ -18,7 +18,13 @@ const mockFetchDashboardData = fetchDashboardData as ReturnType<typeof vi.fn>;
 const mockCalculateDividendSummary =
   calculateDividendSummary as ReturnType<typeof vi.fn>;
 
-const buildDividendSummary = () => ({
+const buildDividendSummary = (
+  overrides: Partial<{
+    totalPreTax: number;
+    totalAfterTax: number;
+    totalInvestment: number;
+  }> = {}
+) => ({
   totalPreTax: 200000,
   totalAfterTax: 200000,
   totalInvestment: 1000000,
@@ -26,6 +32,7 @@ const buildDividendSummary = () => ({
   accountSummaries: [
     { accountType: 'specific', preTax: 200000, afterTax: 200000 },
   ],
+  ...overrides,
 });
 
 const baseInput: DividendGoalRequest = {
@@ -36,6 +43,8 @@ const baseInput: DividendGoalRequest = {
     yield_rate: 3.5,
     dividend_growth_rate: 0,
     tax_mode: 'after_tax',
+    reinvest_rate: 1,
+    account_type: 'nisa',
   },
 };
 
@@ -44,23 +53,119 @@ describe('runDividendGoalSimulation', () => {
     vi.clearAllMocks();
   });
 
-  it('seriesが1年以上分生成され、達成判定が返る', async () => {
+  it('資本ベースの再投資・税区分を反映したseriesを返す', async () => {
+    const currentYear = new Date().getFullYear();
     mockFetchDashboardData.mockResolvedValue({
       ok: true,
       data: { holdings: [], missingDividendCodes: [] },
     });
-    mockCalculateDividendSummary.mockReturnValue(buildDividendSummary());
+    mockCalculateDividendSummary.mockReturnValue(
+      buildDividendSummary({
+        totalPreTax: 100000,
+        totalAfterTax: 80000,
+        totalInvestment: 1000000,
+      })
+    );
 
-    const result = await runDividendGoalSimulation(baseInput);
+    const result = await runDividendGoalSimulation({
+      ...baseInput,
+      assumptions: {
+        ...baseInput.assumptions,
+        yield_rate: 10,
+        reinvest_rate: 1,
+        account_type: 'taxable',
+      },
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.data.series).toHaveLength(3);
-    expect(result.data.result?.achieved).toBe(true);
-    expect(result.data.result?.gap_now).toBe(0);
-    expect(result.data.snapshot?.current_annual_dividend).toBe(200000);
-    expect(result.data.snapshot?.current_yield_rate).toBe(20);
+    expect(result.data.series).toEqual([
+      { year: currentYear, annual_dividend: 100000 },
+      { year: currentYear + 1, annual_dividend: 107969 },
+      { year: currentYear + 2, annual_dividend: 116572 },
+    ]);
+  });
+
+  it('tax_modeの違いが計算結果に影響しない', async () => {
+    mockFetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { holdings: [], missingDividendCodes: [] },
+    });
+    mockCalculateDividendSummary.mockReturnValue(
+      buildDividendSummary({
+        totalPreTax: 100000,
+        totalAfterTax: 80000,
+        totalInvestment: 1000000,
+      })
+    );
+
+    const baseAssumptions = {
+      yield_rate: 10,
+      dividend_growth_rate: 0,
+      reinvest_rate: 1,
+      account_type: 'taxable',
+    } as const;
+
+    const afterTaxResult = await runDividendGoalSimulation({
+      ...baseInput,
+      assumptions: {
+        ...baseAssumptions,
+        tax_mode: 'after_tax',
+      },
+    });
+    const preTaxResult = await runDividendGoalSimulation({
+      ...baseInput,
+      assumptions: {
+        ...baseAssumptions,
+        tax_mode: 'pretax',
+      },
+    });
+
+    expect(afterTaxResult.ok).toBe(true);
+    expect(preTaxResult.ok).toBe(true);
+    if (!afterTaxResult.ok || !preTaxResult.ok) return;
+
+    expect(preTaxResult.data.series).toEqual(afterTaxResult.data.series);
+  });
+
+  it('ショックが指定年以降に永続的に反映される', async () => {
+    const currentYear = new Date().getFullYear();
+    mockFetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { holdings: [], missingDividendCodes: [] },
+    });
+    mockCalculateDividendSummary.mockReturnValue(
+      buildDividendSummary({
+        totalPreTax: 100000,
+        totalAfterTax: 100000,
+        totalInvestment: 1000000,
+      })
+    );
+
+    const result = await runDividendGoalSimulation(
+      {
+        ...baseInput,
+        assumptions: {
+          ...baseInput.assumptions,
+          yield_rate: 10,
+          reinvest_rate: 0,
+          account_type: 'nisa',
+        },
+      },
+      {
+        shock: { year: currentYear + 1, rate: 50 },
+      }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data.series).toEqual([
+      { year: currentYear, annual_dividend: 100000 },
+      { year: currentYear + 1, annual_dividend: 50000 },
+      { year: currentYear + 2, annual_dividend: 50000 },
+    ]);
   });
 
   it('recommendationsが2件返る', async () => {
