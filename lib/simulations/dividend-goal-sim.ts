@@ -165,13 +165,16 @@ const simulateFromSnapshot = (
 };
 
 const buildRecommendationPayload = (
-  label: string,
+  title: string,
+  message: string,
   type: string,
   delta: Record<string, number>,
   result: DividendGoalResult
 ): DividendGoalRecommendation => ({
   type,
-  label,
+  title,
+  label: title,
+  message,
   delta,
   result: {
     achieved: result.achieved ?? false,
@@ -207,12 +210,14 @@ const buildRecommendations = (
   return [
     buildRecommendationPayload(
       '月次+10,000円の影響',
+      '月次追加投資額を10,000円増やした場合の試算結果です。',
       'monthly_contribution',
       { monthly_contribution: monthlyBoost },
       monthlyResult
     ),
     buildRecommendationPayload(
       '利回り+0.5%の影響',
+      '想定利回りを0.5%上げた場合の試算結果です。',
       'yield_rate',
       { yield_rate: yieldBoost },
       yieldResult

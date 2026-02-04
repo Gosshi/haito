@@ -60,6 +60,41 @@ const stringifyRecommendation = (recommendation: DividendGoalRecommendation): st
   return String(recommendation);
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object';
+
+const getTextValue = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const getRecommendationView = (
+  recommendation: DividendGoalRecommendation
+): { title: string | null; message: string | null; fallback: string | null } => {
+  if (!isRecord(recommendation)) {
+    return {
+      title: null,
+      message: null,
+      fallback: stringifyRecommendation(recommendation),
+    };
+  }
+
+  const title =
+    getTextValue(recommendation.title) ?? getTextValue(recommendation.label);
+  const message =
+    getTextValue(recommendation.message) ??
+    getTextValue(recommendation.description);
+
+  if (title || message) {
+    return { title, message, fallback: null };
+  }
+
+  return { title: null, message: null, fallback: stringifyRecommendation(recommendation) };
+};
+
 export function SimulationResults() {
   const response = useSimulationStore((state) => state.response);
   const error = useSimulationStore((state) => state.error);
@@ -175,18 +210,31 @@ export function SimulationResults() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recommendationItems.map((recommendation, index) => (
-                <div
-                  key={`recommendation-${index}`}
-                  data-testid="recommendation-card"
-                  className="rounded-md border p-4"
-                >
-                  <p className="text-sm font-medium">推奨 {index + 1}</p>
-                  <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
-                    {stringifyRecommendation(recommendation)}
-                  </pre>
-                </div>
-              ))}
+              {recommendationItems.map((recommendation, index) => {
+                const view = getRecommendationView(recommendation);
+                return (
+                  <div
+                    key={`recommendation-${index}`}
+                    data-testid="recommendation-card"
+                    className="rounded-md border p-4"
+                  >
+                    <p className="text-sm font-medium">推奨 {index + 1}</p>
+                    {view.title && (
+                      <p className="mt-2 text-sm font-medium">{view.title}</p>
+                    )}
+                    {view.message && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {view.message}
+                      </p>
+                    )}
+                    {view.fallback && (
+                      <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                        {view.fallback}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
