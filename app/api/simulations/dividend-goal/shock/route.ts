@@ -4,13 +4,12 @@ import { createAccessGateService } from '../../../../../lib/access/access-gate';
 import { createClient } from '../../../../../lib/supabase/server';
 import { runDividendGoalSimulation } from '../../../../../lib/simulations/dividend-goal-sim';
 import type {
-  DividendGoalAssumptions,
   DividendGoalResponse,
-  DividendGoalSeriesPoint,
   DividendGoalShockRequest,
   DividendGoalShockResponse,
   SimulationErrorResponse,
 } from '../../../../../lib/simulations/types';
+import { dividendGoalShockRequestSchema } from '../../../../../lib/simulations/types';
 
 const buildErrorResponse = (
   code: string,
@@ -23,115 +22,24 @@ const buildErrorResponse = (
   },
 });
 
-const isNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
-const isTaxMode = (value: unknown): value is DividendGoalAssumptions['tax_mode'] =>
-  value === 'after_tax' || value === 'pretax';
-
 const getCurrentYear = () => new Date().getFullYear();
 
 const validateRequest = (
   body: unknown
 ): { ok: true; value: DividendGoalShockRequest } | { ok: false; message: string } => {
-  if (!body || typeof body !== 'object') {
-    return { ok: false, message: 'Request body must be an object.' };
+  const parsed = dividendGoalShockRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return { ok: false, message: 'Invalid request body.' };
   }
 
-  const request = body as Partial<DividendGoalShockRequest>;
-
-  if (!isNumber(request.target_annual_dividend)) {
-    return { ok: false, message: 'target_annual_dividend is required.' };
-  }
-
-  if (!isNumber(request.monthly_contribution)) {
-    return { ok: false, message: 'monthly_contribution is required.' };
-  }
-
-  if (!isNumber(request.horizon_years) || request.horizon_years < 0) {
-    return { ok: false, message: 'horizon_years must be 0 or greater.' };
-  }
-
-  const assumptions = request.assumptions as DividendGoalAssumptions | undefined;
-  if (!assumptions) {
-    return { ok: false, message: 'assumptions is required.' };
-  }
-
-  if (!isNumber(assumptions.yield_rate)) {
-    return { ok: false, message: 'assumptions.yield_rate is required.' };
-  }
-
-  if (!isNumber(assumptions.dividend_growth_rate)) {
-    return { ok: false, message: 'assumptions.dividend_growth_rate is required.' };
-  }
-
-  if (!isTaxMode(assumptions.tax_mode)) {
-    return { ok: false, message: 'assumptions.tax_mode is invalid.' };
-  }
-
-  const shock = request.shock;
-  if (!shock || typeof shock !== 'object') {
-    return { ok: false, message: 'shock is required.' };
-  }
-
-  if (!isNumber(shock.year) || !Number.isInteger(shock.year)) {
-    return { ok: false, message: 'shock.year must be an integer.' };
-  }
-
-  if (!isNumber(shock.rate) || shock.rate < 0 || shock.rate > 100) {
-    return { ok: false, message: 'shock.rate must be between 0 and 100.' };
-  }
-
+  const request = parsed.data;
   const currentYear = getCurrentYear();
   const maxYear = currentYear + request.horizon_years;
-  if (shock.year < currentYear || shock.year > maxYear) {
+  if (request.shock.year < currentYear || request.shock.year > maxYear) {
     return { ok: false, message: 'shock.year must be within the horizon.' };
   }
 
-  return { ok: true, value: request as DividendGoalShockRequest };
-};
-
-const applyShockToSeries = (
-  series: DividendGoalSeriesPoint[],
-  shockYear: number,
-  shockRate: number
-): DividendGoalSeriesPoint[] => {
-  const multiplier = Math.max(0, 1 - shockRate / 100);
-  return series.map((point) => {
-    if (point.year < shockYear) {
-      return point;
-    }
-    return {
-      ...point,
-      annual_dividend: Math.round(point.annual_dividend * multiplier),
-    };
-  });
-};
-
-const buildResponseFromSeries = (
-  series: DividendGoalSeriesPoint[],
-  input: DividendGoalShockRequest,
-  base: DividendGoalResponse
-): DividendGoalResponse => {
-  const target = input.target_annual_dividend;
-  const achievedPoint = series.find((point) => point.annual_dividend >= target);
-  const endAnnualDividend = series.at(-1)?.annual_dividend ?? null;
-  const currentAnnualDividend =
-    typeof base.snapshot?.current_annual_dividend === 'number'
-      ? base.snapshot.current_annual_dividend
-      : 0;
-
-  return {
-    snapshot: base.snapshot ?? null,
-    result: {
-      achieved: Boolean(achievedPoint),
-      achieved_in_year: achievedPoint?.year ?? null,
-      gap_now: Math.max(0, target - Math.max(0, currentAnnualDividend)),
-      end_annual_dividend: endAnnualDividend,
-      target_annual_dividend: target,
-    },
-    series,
-  };
+  return { ok: true, value: request };
 };
 
 const buildDelta = (
@@ -210,13 +118,19 @@ export async function POST(
     );
   }
 
+  const shockedResult = await runDividendGoalSimulation(input, {
+    shock: input.shock,
+  });
+
+  if (!shockedResult.ok) {
+    return NextResponse.json(
+      buildErrorResponse('INTERNAL_ERROR', 'Simulation failed.'),
+      { status: 500 }
+    );
+  }
+
   const base = baseResult.data;
-  const shockedSeries = applyShockToSeries(
-    base.series ?? [],
-    input.shock.year,
-    input.shock.rate
-  );
-  const shocked = buildResponseFromSeries(shockedSeries, input, base);
+  const { recommendations: _recommendations, ...shocked } = shockedResult.data;
   const delta = buildDelta(base, shocked);
 
   return NextResponse.json({

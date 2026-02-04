@@ -1,22 +1,28 @@
 export {
+  accountTypeSchema,
   dividendGoalAssumptionsSchema,
   dividendGoalRecommendationSchema,
   dividendGoalRequestSchema,
   dividendGoalResponseSchema,
   dividendGoalResultSchema,
   dividendGoalSeriesPointSchema,
+  dividendGoalShockRequestSchema,
+  dividendGoalShockSchema,
   dividendGoalSnapshotSchema,
   simulationErrorSchema,
   taxModeSchema,
 } from './dividend-goal-schema';
 
 export type {
+  AccountType,
   DividendGoalAssumptions,
   DividendGoalRecommendation,
   DividendGoalRequest,
   DividendGoalResponse,
   DividendGoalResult,
   DividendGoalSeriesPoint,
+  DividendGoalShock,
+  DividendGoalShockRequest,
   DividendGoalSnapshot,
   SimulationErrorResponse,
   TaxMode,
@@ -47,15 +53,6 @@ export type DividendGoalScenario = {
 
 export type DividendGoalScenarioCompareResponse = {
   scenarios: DividendGoalScenario[];
-};
-
-export type DividendGoalShock = {
-  year: number;
-  rate: number;
-};
-
-export type DividendGoalShockRequest = DividendGoalRequest & {
-  shock: DividendGoalShock;
 };
 
 export type DividendGoalShockDelta = {

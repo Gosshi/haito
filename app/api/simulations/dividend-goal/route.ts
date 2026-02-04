@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 
+import { resolvePlanTier } from '../../../../lib/billing/plans';
 import { createClient } from '../../../../lib/supabase/server';
+import { normalizeDividendGoalAssumptions } from '../../../../lib/simulations/assumptions-normalizer';
 import { runDividendGoalSimulation } from '../../../../lib/simulations/dividend-goal-sim';
 import {
   dividendGoalRequestSchema,
@@ -70,7 +72,12 @@ export async function POST(
     );
   }
 
-  const result = await runDividendGoalSimulation(parsed.data);
+  const plan = resolvePlanTier(user.app_metadata?.plan ?? null);
+  const { request: normalizedRequest } = normalizeDividendGoalAssumptions(
+    parsed.data,
+    plan
+  );
+  const result = await runDividendGoalSimulation(normalizedRequest);
   if (!result.ok) {
     const status = toStatusCode(result.error.error.code);
     return NextResponse.json(result.error, { status });

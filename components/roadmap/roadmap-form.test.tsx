@@ -6,18 +6,23 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 import * as settingsStore from '../../stores/settings-store';
 import * as roadmapStore from '../../stores/roadmap-store';
+import * as featureAccessStore from '../../stores/feature-access-store';
 import { RoadmapForm } from './roadmap-form';
 import type { UserSettings } from '../../lib/settings/types';
 import type { DividendGoalResponse } from '../../lib/simulations/types';
+import type { BillingStatus } from '../../lib/access/billing-status';
+import type { FeatureAccessState } from '../../stores/feature-access-store';
 
 vi.mock('../../stores/settings-store');
 vi.mock('../../stores/roadmap-store');
+vi.mock('../../stores/feature-access-store');
 
 const mockRunRoadmap = vi.fn();
 
 const setupStores = (
   settings: UserSettings | null,
-  response: DividendGoalResponse | null
+  response: DividendGoalResponse | null,
+  billingStatus: BillingStatus | null = { plan: 'premium', is_active: true }
 ) => {
   vi.mocked(settingsStore.useSettingsStore).mockImplementation((selector) => {
     const state = {
@@ -41,6 +46,19 @@ const setupStores = (
     };
     return selector(state);
   });
+
+  vi.mocked(featureAccessStore.useFeatureAccessStore).mockImplementation(
+    (selector) => {
+      const state: FeatureAccessState = {
+        status: billingStatus,
+        locks: {} as FeatureAccessState['locks'],
+        refreshStatus: vi.fn().mockResolvedValue(undefined),
+        lockFeature: vi.fn(),
+        unlockFeature: vi.fn(),
+      };
+      return selector(state);
+    }
+  );
 };
 
 describe('RoadmapForm', () => {
@@ -64,7 +82,15 @@ describe('RoadmapForm', () => {
     expect(screen.getByLabelText('期間（年）')).toHaveAttribute('type', 'number');
     expect(screen.getByLabelText('想定利回り（%）')).toHaveAttribute('type', 'number');
     expect(screen.getByLabelText('想定増配率（%）')).toHaveAttribute('type', 'number');
-    expect(screen.getByLabelText('税区分')).toBeInTheDocument();
+    expect(screen.getByText('再投資（配当の使い道）')).toBeInTheDocument();
+    expect(screen.getByLabelText('再投資率（0.0〜1.0）')).toHaveAttribute('type', 'number');
+    expect(screen.getByLabelText('税区分（NISA/課税）')).toBeInTheDocument();
+    expect(screen.getByLabelText('税モード')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '税率は簡易的に固定値で計算しています。入力前提に基づく試算です。'
+      )
+    ).toBeInTheDocument();
   });
 
   it('user_settingsとsnapshotから初期値を反映する', () => {
@@ -139,7 +165,13 @@ describe('RoadmapForm', () => {
     fireEvent.change(screen.getByLabelText('想定増配率（%）'), {
       target: { value: '2' },
     });
-    fireEvent.change(screen.getByLabelText('税区分'), {
+    fireEvent.change(screen.getByLabelText('再投資率（0.0〜1.0）'), {
+      target: { value: '0.8' },
+    });
+    fireEvent.change(screen.getByLabelText('税区分（NISA/課税）'), {
+      target: { value: 'taxable' },
+    });
+    fireEvent.change(screen.getByLabelText('税モード'), {
       target: { value: 'after_tax' },
     });
 
@@ -152,9 +184,35 @@ describe('RoadmapForm', () => {
       assumptions: {
         yield_rate: 3.5,
         dividend_growth_rate: 2,
+        reinvest_rate: 0.8,
+        account_type: 'taxable',
         tax_mode: 'after_tax',
       },
     });
+  });
+
+  it('freeプランでは再投資率と税区分がロックされ注記が表示される', () => {
+    setupStores(null, null, { plan: 'free', is_active: false });
+
+    render(<RoadmapForm />);
+
+    expect(screen.getByLabelText('再投資率（0.0〜1.0）')).toBeDisabled();
+    expect(screen.getByLabelText('税区分（NISA/課税）')).toBeDisabled();
+    expect(
+      screen.getByText('Freeでは再投資は100%・税区分はNISA固定で試算します')
+    ).toBeInTheDocument();
+  });
+
+  it('有料プランでは再投資率と税区分を変更できる', () => {
+    setupStores(null, null, { plan: 'premium', is_active: true });
+
+    render(<RoadmapForm />);
+
+    expect(screen.getByLabelText('再投資率（0.0〜1.0）')).not.toBeDisabled();
+    expect(screen.getByLabelText('税区分（NISA/課税）')).not.toBeDisabled();
+    expect(
+      screen.queryByText('Freeでは再投資は100%・税区分はNISA固定で試算します')
+    ).toBeNull();
   });
 
   it('未入力時は実行ボタンが無効になる', () => {

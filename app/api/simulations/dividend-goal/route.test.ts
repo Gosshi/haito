@@ -106,6 +106,79 @@ describe('POST /api/simulations/dividend-goal', () => {
     expect(json.error.code).toBe('BAD_REQUEST');
   });
 
+  it('再投資率が範囲外の場合は400を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validRequestBody,
+          assumptions: {
+            ...validRequestBody.assumptions,
+            reinvest_rate: 1.5,
+          },
+        }),
+      })
+    );
+
+    const json = (await response.json()) as SimulationErrorResponse;
+
+    expect(response.status).toBe(400);
+    expect(json.error.code).toBe('BAD_REQUEST');
+  });
+
+  it('freeプランでは再投資率と税区分を丸めて計算に渡す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1', app_metadata: { plan: 'free' } } },
+          error: null,
+        }),
+      },
+    });
+
+    mockRunSimulation.mockResolvedValue({
+      ok: true,
+      data: {
+        snapshot: null,
+        result: null,
+        series: [],
+        recommendations: [],
+      },
+    });
+
+    await POST(
+      new Request('http://localhost/api/simulations/dividend-goal', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validRequestBody,
+          assumptions: {
+            ...validRequestBody.assumptions,
+            reinvest_rate: 0.4,
+            account_type: 'taxable',
+          },
+        }),
+      })
+    );
+
+    expect(mockRunSimulation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assumptions: expect.objectContaining({
+          reinvest_rate: 1,
+          account_type: 'nisa',
+        }),
+      })
+    );
+  });
+
   it('シミュレーションエラー時は500を返す', async () => {
     mockCreateClient.mockReturnValue({
       auth: {

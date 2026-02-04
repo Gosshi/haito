@@ -3,10 +3,15 @@ import { z } from 'zod';
 export const taxModeSchema = z.enum(['pretax', 'after_tax']);
 export type TaxMode = z.infer<typeof taxModeSchema>;
 
+export const accountTypeSchema = z.enum(['nisa', 'taxable']);
+export type AccountType = z.infer<typeof accountTypeSchema>;
+
 export const dividendGoalAssumptionsSchema = z.object({
   yield_rate: z.number().finite(),
   dividend_growth_rate: z.number().finite(),
   tax_mode: taxModeSchema,
+  reinvest_rate: z.number().finite().min(0).max(1).default(1),
+  account_type: accountTypeSchema.default('nisa'),
 });
 export type DividendGoalAssumptions = z.infer<typeof dividendGoalAssumptionsSchema>;
 
@@ -17,6 +22,17 @@ export const dividendGoalRequestSchema = z.object({
   assumptions: dividendGoalAssumptionsSchema,
 });
 export type DividendGoalRequest = z.infer<typeof dividendGoalRequestSchema>;
+
+export const dividendGoalShockSchema = z.object({
+  year: z.number().int(),
+  rate: z.number().finite().min(0).max(100),
+});
+export type DividendGoalShock = z.infer<typeof dividendGoalShockSchema>;
+
+export const dividendGoalShockRequestSchema = dividendGoalRequestSchema.extend({
+  shock: dividendGoalShockSchema,
+});
+export type DividendGoalShockRequest = z.infer<typeof dividendGoalShockRequestSchema>;
 
 export const dividendGoalSnapshotSchema = z.object({
   current_annual_dividend: z.number().finite().nullable().optional(),

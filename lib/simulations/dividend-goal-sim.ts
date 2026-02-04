@@ -1,12 +1,14 @@
 import { calculateDividendSummary } from '../calculations/dividend';
 import { fetchDashboardData } from '../api/dashboard';
 import type {
+  AccountType,
   DividendGoalRecommendation,
   DividendGoalRequest,
   DividendGoalResponse,
   DividendGoalResult,
   DividendGoalSeriesPoint,
   DividendGoalSnapshot,
+  DividendGoalShock,
   SimulationErrorResponse,
   SimulationResult,
   TaxMode,
@@ -15,6 +17,12 @@ import type {
 type SnapshotContext = {
   currentAnnualDividend: number;
   currentYieldRate: number | null;
+  totalInvestment: number;
+  totalPreTax: number;
+};
+
+type SimulationOptions = {
+  shock?: DividendGoalShock;
 };
 
 const buildErrorResponse = (
@@ -33,6 +41,9 @@ const roundCurrency = (value: number): number => Math.round(value);
 
 const normalizeNumber = (value: number | null | undefined): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const resolveTaxRate = (accountType: AccountType): number =>
+  accountType === 'taxable' ? 0.20315 : 0;
 
 const calculateYieldRate = (
   taxMode: TaxMode,
@@ -89,34 +100,69 @@ const buildSnapshotContext = async (
         typeof currentYieldRate === 'number'
           ? Math.round(currentYieldRate * 100) / 100
           : null,
+      totalInvestment: Math.max(0, totalInvestment),
+      totalPreTax: Math.max(0, totalPreTax),
     },
   };
 };
 
 const buildSeries = (
   input: DividendGoalRequest,
-  currentAnnualDividend: number
+  context: SnapshotContext,
+  options?: SimulationOptions
 ): DividendGoalSeriesPoint[] => {
   const startYear = new Date().getFullYear();
   const years = Math.max(0, Math.floor(input.horizon_years));
   const growthRate = input.assumptions.dividend_growth_rate / 100;
-  const yieldRate = input.assumptions.yield_rate / 100;
+  const baseYieldRate = input.assumptions.yield_rate / 100;
   const annualContribution = input.monthly_contribution * 12;
+  const reinvestRate = input.assumptions.reinvest_rate;
+  const taxRate = resolveTaxRate(input.assumptions.account_type);
+  const shock = options?.shock;
+  const shockMultiplier =
+    shock !== undefined ? Math.max(0, 1 - shock.rate / 100) : 1;
 
   const series: DividendGoalSeriesPoint[] = [];
-  let annualDividend = Math.max(0, currentAnnualDividend);
+  const initialCapital =
+    context.totalInvestment > 0
+      ? context.totalInvestment
+      : baseYieldRate > 0
+        ? context.totalPreTax / baseYieldRate
+        : 0;
+  let capital = Math.max(0, initialCapital);
+
+  const resolveEffectiveYield = (index: number): number => {
+    if (!Number.isFinite(baseYieldRate) || baseYieldRate <= 0) {
+      return 0;
+    }
+    const growthFactor = Number.isFinite(growthRate)
+      ? Math.pow(1 + growthRate, index)
+      : 1;
+    const base = baseYieldRate * growthFactor;
+    if (!Number.isFinite(base)) {
+      return 0;
+    }
+    const year = startYear + index;
+    const adjusted =
+      shock && year >= shock.year ? base * shockMultiplier : base;
+    return Math.max(0, adjusted);
+  };
+
+  let annualDividend = Math.max(0, capital * resolveEffectiveYield(0));
 
   for (let index = 0; index <= years; index += 1) {
-    if (index > 0) {
-      const growth = annualDividend * growthRate;
-      const contributionImpact = annualContribution * yieldRate;
-      annualDividend = Math.max(0, annualDividend + growth + contributionImpact);
-    }
-
     series.push({
       year: startYear + index,
       annual_dividend: roundCurrency(annualDividend),
     });
+
+    if (index === years) {
+      break;
+    }
+
+    const reinvested = annualDividend * reinvestRate * (1 - taxRate);
+    capital = Math.max(0, capital + annualContribution + reinvested);
+    annualDividend = Math.max(0, capital * resolveEffectiveYield(index + 1));
   }
 
   return series;
@@ -152,9 +198,10 @@ const buildSnapshot = (
 
 const simulateFromSnapshot = (
   input: DividendGoalRequest,
-  context: SnapshotContext
+  context: SnapshotContext,
+  options?: SimulationOptions
 ): { series: DividendGoalSeriesPoint[]; result: DividendGoalResult } => {
-  const series = buildSeries(input, context.currentAnnualDividend);
+  const series = buildSeries(input, context, options);
   const result = buildResult(
     series,
     input.target_annual_dividend,
@@ -187,7 +234,8 @@ const buildRecommendationPayload = (
 
 const buildRecommendations = (
   input: DividendGoalRequest,
-  context: SnapshotContext
+  context: SnapshotContext,
+  options?: SimulationOptions
 ): DividendGoalRecommendation[] => {
   const monthlyBoost = 10000;
   const yieldBoost = 0.5;
@@ -196,7 +244,11 @@ const buildRecommendations = (
     ...input,
     monthly_contribution: input.monthly_contribution + monthlyBoost,
   };
-  const monthlyResult = simulateFromSnapshot(monthlyInput, context).result;
+  const monthlyResult = simulateFromSnapshot(
+    monthlyInput,
+    context,
+    options
+  ).result;
 
   const yieldInput: DividendGoalRequest = {
     ...input,
@@ -205,7 +257,11 @@ const buildRecommendations = (
       yield_rate: input.assumptions.yield_rate + yieldBoost,
     },
   };
-  const yieldResult = simulateFromSnapshot(yieldInput, context).result;
+  const yieldResult = simulateFromSnapshot(
+    yieldInput,
+    context,
+    options
+  ).result;
 
   return [
     buildRecommendationPayload(
@@ -226,7 +282,8 @@ const buildRecommendations = (
 };
 
 export const runDividendGoalSimulation = async (
-  input: DividendGoalRequest
+  input: DividendGoalRequest,
+  options?: SimulationOptions
 ): Promise<SimulationResult<DividendGoalResponse>> => {
   const snapshotContext = await buildSnapshotContext(input.assumptions.tax_mode);
   if (!snapshotContext.ok) {
@@ -234,8 +291,8 @@ export const runDividendGoalSimulation = async (
   }
 
   const context = snapshotContext.data;
-  const { series, result } = simulateFromSnapshot(input, context);
-  const recommendations = buildRecommendations(input, context);
+  const { series, result } = simulateFromSnapshot(input, context, options);
+  const recommendations = buildRecommendations(input, context, options);
 
   return {
     ok: true,
