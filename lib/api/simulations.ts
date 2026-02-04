@@ -3,12 +3,15 @@ import type {
   DividendGoalResponse,
   DividendGoalScenarioCompareRequest,
   DividendGoalScenarioCompareResponse,
+  DividendGoalShockRequest,
+  DividendGoalShockResponse,
   SimulationErrorResponse,
   SimulationResult,
 } from '../simulations/types';
 
 const SIMULATION_ENDPOINT = '/api/simulations/dividend-goal';
 const SCENARIO_COMPARE_ENDPOINT = '/api/simulations/dividend-goal/scenarios';
+const SHOCK_ENDPOINT = '/api/simulations/dividend-goal/shock';
 
 const buildFallbackError = (
   status: number,
@@ -19,6 +22,16 @@ const buildFallbackError = (
       error: {
         code: 'UNAUTHORIZED',
         message: 'Authentication required.',
+        details: null,
+      },
+    };
+  }
+
+  if (status === 403) {
+    return {
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Access forbidden.',
         details: null,
       },
     };
@@ -64,6 +77,15 @@ const normalizeErrorResponse = (
         error: {
           ...errorBody.error,
           code: 'UNAUTHORIZED',
+        },
+      };
+    }
+
+    if (status === 403) {
+      return {
+        error: {
+          ...errorBody.error,
+          code: 'FORBIDDEN',
         },
       };
     }
@@ -132,6 +154,51 @@ export const runDividendGoalScenarioCompare = async (
     if (response.ok) {
       const data =
         (await response.json()) as DividendGoalScenarioCompareResponse;
+      return { ok: true, data };
+    }
+
+    let errorBody: SimulationErrorResponse | null = null;
+    try {
+      errorBody = (await response.json()) as SimulationErrorResponse;
+    } catch {
+      errorBody = null;
+    }
+
+    return {
+      ok: false,
+      error: normalizeErrorResponse(
+        response.status,
+        response.statusText,
+        errorBody
+      ),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network error';
+    return {
+      ok: false,
+      error: {
+        error: {
+          code: 'NETWORK_ERROR',
+          message,
+          details: null,
+        },
+      },
+    };
+  }
+};
+
+export const runDividendGoalShock = async (
+  input: DividendGoalShockRequest
+): Promise<SimulationResult<DividendGoalShockResponse>> => {
+  try {
+    const response = await fetch(SHOCK_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+
+    if (response.ok) {
+      const data = (await response.json()) as DividendGoalShockResponse;
       return { ok: true, data };
     }
 
