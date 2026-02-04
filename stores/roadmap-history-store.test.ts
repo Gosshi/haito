@@ -182,7 +182,7 @@ describe('useRoadmapHistoryStore', () => {
       message: 'Failed to save history',
     });
     expect(toastStore.pushToast).toHaveBeenCalledWith(
-      '履歴の保存に失敗しました: Failed to save history',
+      '履歴の保存に失敗しました。',
       'error'
     );
   });
