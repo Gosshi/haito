@@ -88,21 +88,23 @@ describe('DividendGoalShockApi access control', () => {
       }),
     });
 
+    const baseResponse = {
+      snapshot: {
+        current_annual_dividend: 100000,
+        current_yield_rate: 3.2,
+      },
+      result: {
+        achieved: false,
+        achieved_in_year: null,
+        end_annual_dividend: 100000,
+        target_annual_dividend: 120000,
+      },
+      series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
+    };
+
     mockRunSimulation.mockResolvedValue({
       ok: true,
-      data: {
-        snapshot: {
-          current_annual_dividend: 100000,
-          current_yield_rate: 3.2,
-        },
-        result: {
-          achieved: false,
-          achieved_in_year: null,
-          end_annual_dividend: 100000,
-          target_annual_dividend: 120000,
-        },
-        series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
-      },
+      data: baseResponse,
     });
 
     const response = await POST(
@@ -113,5 +115,7 @@ describe('DividendGoalShockApi access control', () => {
     );
 
     expect(response.status).toBe(200);
+    const json = (await response.json()) as { base?: unknown };
+    expect(json.base).toEqual(baseResponse);
   });
 });

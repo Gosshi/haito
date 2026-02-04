@@ -69,7 +69,7 @@ describe('RoadmapHistoryDetailView', () => {
 
     expect(screen.getByText('入力条件')).toBeInTheDocument();
     expect(screen.getByText('年間配当ゴール')).toBeInTheDocument();
-    expect(screen.getByText('¥1,200,000')).toBeInTheDocument();
+    expect(screen.getAllByText('¥1,200,000')).toHaveLength(2);
     expect(screen.getByText('サマリー')).toBeInTheDocument();
     expect(screen.getByText('シリーズ')).toBeInTheDocument();
   });

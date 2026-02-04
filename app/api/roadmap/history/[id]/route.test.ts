@@ -73,7 +73,8 @@ describe('GET /api/roadmap/history/[id]', () => {
       data: null,
       error: { code: 'PGRST116' },
     });
-    const mockEq = vi.fn().mockReturnValue({ eq: mockEq, single: mockSingle });
+    const mockEq = vi.fn();
+    mockEq.mockReturnValue({ eq: mockEq, single: mockSingle });
     const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -89,9 +90,9 @@ describe('GET /api/roadmap/history/[id]', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost:3000/api/roadmap/history/11111111-1111-1111-1111-111111111111'
+        'http://localhost:3000/api/roadmap/history/11111111-1111-4111-8111-111111111111'
       ),
-      { params: { id: '11111111-1111-1111-1111-111111111111' } }
+      { params: { id: '11111111-1111-4111-8111-111111111111' } }
     );
     const json = (await response.json()) as RoadmapHistoryResult<
       RoadmapHistoryDetail
@@ -115,7 +116,8 @@ describe('GET /api/roadmap/history/[id]', () => {
       },
       error: null,
     });
-    const mockEq = vi.fn().mockReturnValue({ eq: mockEq, single: mockSingle });
+    const mockEq = vi.fn();
+    mockEq.mockReturnValue({ eq: mockEq, single: mockSingle });
     const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
     const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
 
@@ -131,9 +133,9 @@ describe('GET /api/roadmap/history/[id]', () => {
 
     const response = await GET(
       new Request(
-        'http://localhost:3000/api/roadmap/history/11111111-1111-1111-1111-111111111111'
+        'http://localhost:3000/api/roadmap/history/11111111-1111-4111-8111-111111111111'
       ),
-      { params: { id: '11111111-1111-1111-1111-111111111111' } }
+      { params: { id: '11111111-1111-4111-8111-111111111111' } }
     );
     const json = (await response.json()) as RoadmapHistoryResult<
       RoadmapHistoryDetail
