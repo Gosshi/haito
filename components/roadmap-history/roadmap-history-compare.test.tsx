@@ -92,8 +92,8 @@ describe('RoadmapHistoryCompare', () => {
     render(<RoadmapHistoryCompare />);
 
     expect(screen.getByText('比較サマリー')).toBeInTheDocument();
-    expect(screen.getByText('年間配当ゴール')).toBeInTheDocument();
-    expect(screen.getByText('最終年の年間配当')).toBeInTheDocument();
+    expect(screen.getAllByText('年間配当ゴール')).toHaveLength(2);
+    expect(screen.getAllByText('最終年の年間配当')).toHaveLength(2);
     expect(screen.getByText('¥1,200,000')).toBeInTheDocument();
     expect(screen.getByText('¥1,000,000')).toBeInTheDocument();
     expect(screen.getByText('¥180,000')).toBeInTheDocument();

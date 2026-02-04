@@ -10,19 +10,19 @@ vi.mock('../../../../../lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
-vi.mock('../../../../../lib/simulations/mock', () => ({
-  runDividendGoalSimulationMock: vi.fn(),
+vi.mock('../../../../../lib/simulations/dividend-goal-sim', () => ({
+  runDividendGoalSimulation: vi.fn(),
 }));
 
 import { createAccessGateService } from '../../../../../lib/access/access-gate';
 import { createClient } from '../../../../../lib/supabase/server';
-import { runDividendGoalSimulationMock } from '../../../../../lib/simulations/mock';
+import { runDividendGoalSimulation } from '../../../../../lib/simulations/dividend-goal-sim';
 
 const mockCreateAccessGateService =
   createAccessGateService as ReturnType<typeof vi.fn>;
 const mockCreateClient = createClient as ReturnType<typeof vi.fn>;
 const mockRunSimulation =
-  runDividendGoalSimulationMock as ReturnType<typeof vi.fn>;
+  runDividendGoalSimulation as ReturnType<typeof vi.fn>;
 
 const validRequestBody = {
   target_annual_dividend: 120000,
@@ -88,24 +88,23 @@ describe('DividendGoalShockApi access control', () => {
       }),
     });
 
+    const baseResponse = {
+      snapshot: {
+        current_annual_dividend: 100000,
+        current_yield_rate: 3.2,
+      },
+      result: {
+        achieved: false,
+        achieved_in_year: null,
+        end_annual_dividend: 100000,
+        target_annual_dividend: 120000,
+      },
+      series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
+    };
+
     mockRunSimulation.mockResolvedValue({
       ok: true,
-      data: {
-        snapshot: {
-          target_annual_dividend: 120000,
-          expected_annual_dividend: 100000,
-          horizon_years: 5,
-          yield_rate: 3.5,
-          dividend_growth_rate: 2.1,
-          tax_mode: 'after_tax',
-        },
-        result: {
-          achieved: false,
-          achieved_in_year: null,
-          end_annual_dividend: 100000,
-        },
-        series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
-      },
+      data: baseResponse,
     });
 
     const response = await POST(
@@ -116,5 +115,7 @@ describe('DividendGoalShockApi access control', () => {
     );
 
     expect(response.status).toBe(200);
+    const json = (await response.json()) as { base?: unknown };
+    expect(json.base).toEqual(baseResponse);
   });
 });

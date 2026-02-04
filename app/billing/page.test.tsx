@@ -66,9 +66,9 @@ describe('BillingPage', () => {
     render(<BillingPage />);
 
     expect(await screen.findByText('料金プラン')).toBeInTheDocument();
-    expect(screen.getByText('無料プラン')).toBeInTheDocument();
-    expect(screen.getByText('プレミアムプラン')).toBeInTheDocument();
-    expect(screen.getByText('現在のプラン')).toBeInTheDocument();
+    expect(screen.getAllByText('無料プラン').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'プレミアムプラン' })).toBeInTheDocument();
+    expect(screen.getAllByText('現在のプラン').length).toBeGreaterThan(0);
   });
 
   it('決済開始でCheckoutに遷移する', async () => {

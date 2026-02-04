@@ -72,7 +72,10 @@ const request = async <T>(
   options: RequestInit
 ): Promise<RoadmapHistoryResult<T>> => {
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, {
+      credentials: 'include',
+      ...options,
+    });
     let body: unknown = null;
 
     try {

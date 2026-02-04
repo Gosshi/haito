@@ -113,8 +113,15 @@ export const useRoadmapHistoryStore = create<RoadmapHistoryState>((set, get) => 
     }
 
     if (!result.ok) {
+      const type = result.error.type;
+      const message =
+        type === 'unauthorized'
+          ? 'ログインが必要です。履歴を保存できませんでした。'
+          : type === 'validation'
+            ? '入力内容を確認してください。履歴を保存できませんでした。'
+            : '履歴の保存に失敗しました。';
       set({ error: result.error });
-      pushToast('履歴の保存に失敗しました。', 'error');
+      pushToast(message, 'error');
       return result;
     }
 
