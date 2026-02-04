@@ -118,4 +118,37 @@ describe('DividendGoalShockApi access control', () => {
     const json = (await response.json()) as { base?: unknown };
     expect(json.base).toEqual(baseResponse);
   });
+
+  it('再投資率が範囲外の場合は400を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: true,
+        plan: 'premium',
+      }),
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validRequestBody,
+          assumptions: {
+            ...validRequestBody.assumptions,
+            reinvest_rate: 2,
+          },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(400);
+  });
 });
