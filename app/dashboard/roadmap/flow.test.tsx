@@ -7,11 +7,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import RoadmapPage from './page';
 import { useRoadmapStore } from '../../../stores/roadmap-store';
 import * as settingsStore from '../../../stores/settings-store';
+import * as scenarioCompareStore from '../../../stores/scenario-compare-store';
 import * as roadmapSimulation from '../../../lib/simulations/roadmap';
 import type { DividendGoalResponse } from '../../../lib/simulations/types';
 
 vi.mock('../../../stores/settings-store');
 vi.mock('../../../lib/simulations/roadmap');
+vi.mock('../../../stores/scenario-compare-store');
 
 const setupSettingsStore = () => {
   vi.mocked(settingsStore.useSettingsStore).mockImplementation((selector) => {
@@ -25,6 +27,22 @@ const setupSettingsStore = () => {
     };
     return selector(state);
   });
+};
+
+const setupScenarioCompareStore = () => {
+  vi.mocked(scenarioCompareStore.useScenarioCompareStore).mockImplementation(
+    (selector) => {
+      const state = {
+        input: null,
+        response: null,
+        error: null,
+        isLoading: false,
+        runScenarioCompare: vi.fn(),
+        setInputFromRoadmap: vi.fn(),
+      };
+      return selector(state);
+    }
+  );
 };
 
 const fillRequiredInputs = () => {
@@ -49,6 +67,7 @@ describe('RoadmapPage integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupSettingsStore();
+    setupScenarioCompareStore();
     useRoadmapStore.setState({
       input: null,
       response: null,

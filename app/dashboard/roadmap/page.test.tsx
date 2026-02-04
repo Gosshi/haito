@@ -7,10 +7,12 @@ import { render, screen } from '@testing-library/react';
 import RoadmapPage from './page';
 import * as settingsStore from '../../../stores/settings-store';
 import * as roadmapStore from '../../../stores/roadmap-store';
+import * as scenarioCompareStore from '../../../stores/scenario-compare-store';
 import type { SimulationErrorResponse } from '../../../lib/simulations/types';
 
 vi.mock('../../../stores/settings-store');
 vi.mock('../../../stores/roadmap-store');
+vi.mock('../../../stores/scenario-compare-store');
 
 const setupStores = (error: SimulationErrorResponse | null = null) => {
   const mockFetchSettings = vi.fn();
@@ -37,6 +39,20 @@ const setupStores = (error: SimulationErrorResponse | null = null) => {
     };
     return selector(state);
   });
+
+  vi.mocked(scenarioCompareStore.useScenarioCompareStore).mockImplementation(
+    (selector) => {
+      const state = {
+        input: null,
+        response: null,
+        error: null,
+        isLoading: false,
+        runScenarioCompare: vi.fn(),
+        setInputFromRoadmap: vi.fn(),
+      };
+      return selector(state);
+    }
+  );
 
   return { mockFetchSettings };
 };
