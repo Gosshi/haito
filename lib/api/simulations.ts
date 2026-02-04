@@ -1,11 +1,14 @@
 import type {
   DividendGoalRequest,
   DividendGoalResponse,
+  DividendGoalScenarioCompareRequest,
+  DividendGoalScenarioCompareResponse,
   SimulationErrorResponse,
   SimulationResult,
 } from '../simulations/types';
 
 const SIMULATION_ENDPOINT = '/api/simulations/dividend-goal';
+const SCENARIO_COMPARE_ENDPOINT = '/api/simulations/dividend-goal/scenarios';
 
 const buildFallbackError = (
   status: number,
@@ -83,6 +86,52 @@ export const runDividendGoalSimulation = async (
 
     if (response.ok) {
       const data = (await response.json()) as DividendGoalResponse;
+      return { ok: true, data };
+    }
+
+    let errorBody: SimulationErrorResponse | null = null;
+    try {
+      errorBody = (await response.json()) as SimulationErrorResponse;
+    } catch {
+      errorBody = null;
+    }
+
+    return {
+      ok: false,
+      error: normalizeErrorResponse(
+        response.status,
+        response.statusText,
+        errorBody
+      ),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network error';
+    return {
+      ok: false,
+      error: {
+        error: {
+          code: 'NETWORK_ERROR',
+          message,
+          details: null,
+        },
+      },
+    };
+  }
+};
+
+export const runDividendGoalScenarioCompare = async (
+  input: DividendGoalScenarioCompareRequest
+): Promise<SimulationResult<DividendGoalScenarioCompareResponse>> => {
+  try {
+    const response = await fetch(SCENARIO_COMPARE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+
+    if (response.ok) {
+      const data =
+        (await response.json()) as DividendGoalScenarioCompareResponse;
       return { ok: true, data };
     }
 
