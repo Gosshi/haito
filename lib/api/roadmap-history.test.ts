@@ -58,7 +58,10 @@ describe('fetchRoadmapHistoryList', () => {
     const result = await fetchRoadmapHistoryList();
 
     expect(result).toEqual({ ok: true, data: mockList });
-    expect(fetch).toHaveBeenCalledWith('/api/roadmap/history', { method: 'GET' });
+    expect(fetch).toHaveBeenCalledWith('/api/roadmap/history', {
+      method: 'GET',
+      credentials: 'include',
+    });
   });
 
   it('limitを指定した場合はクエリに含める', async () => {
@@ -69,7 +72,10 @@ describe('fetchRoadmapHistoryList', () => {
 
     await fetchRoadmapHistoryList(5);
 
-    expect(fetch).toHaveBeenCalledWith('/api/roadmap/history?limit=5', { method: 'GET' });
+    expect(fetch).toHaveBeenCalledWith('/api/roadmap/history?limit=5', {
+      method: 'GET',
+      credentials: 'include',
+    });
   });
 
   it('エラー時にエラー結果を返す', async () => {
@@ -113,7 +119,7 @@ describe('fetchRoadmapHistoryDetail', () => {
     expect(result).toEqual({ ok: true, data: mockDetail });
     expect(fetch).toHaveBeenCalledWith(
       `/api/roadmap/history/${mockDetail.id}`,
-      { method: 'GET' }
+      { method: 'GET', credentials: 'include' }
     );
   });
 
@@ -165,6 +171,7 @@ describe('createRoadmapHistory', () => {
     expect(fetch).toHaveBeenCalledWith('/api/roadmap/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(payload),
     });
   });

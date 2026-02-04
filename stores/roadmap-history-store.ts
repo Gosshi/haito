@@ -114,7 +114,10 @@ export const useRoadmapHistoryStore = create<RoadmapHistoryState>((set, get) => 
 
     if (!result.ok) {
       set({ error: result.error });
-      pushToast('履歴の保存に失敗しました。', 'error');
+      const message = result.error.message
+        ? `履歴の保存に失敗しました: ${result.error.message}`
+        : '履歴の保存に失敗しました。';
+      pushToast(message, 'error');
       return result;
     }
 
