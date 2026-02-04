@@ -8,6 +8,7 @@ import type {
   SimulationErrorResponse,
 } from '../lib/simulations/types';
 import { runDividendGoalShock } from '../lib/api/simulations';
+import { useFeatureAccessStore } from './feature-access-store';
 
 export type RoadmapShockState = {
   input: DividendGoalShockRequest | null;
@@ -49,6 +50,11 @@ export const useRoadmapShockStore = create<RoadmapShockState>((set) => ({
     }
 
     if (!result.ok) {
+      if (result.error.error.code === 'FORBIDDEN') {
+        useFeatureAccessStore
+          .getState()
+          .lockFeature('stress_test', 'forbidden');
+      }
       set({ error: result.error, response: null, isLoading: false });
       return;
     }

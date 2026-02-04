@@ -8,8 +8,14 @@ import type {
   SimulationErrorResponse,
   SimulationResult,
 } from '../lib/simulations/types';
+import { useFeatureAccessStore } from './feature-access-store';
 
 vi.mock('../lib/api/simulations');
+vi.mock('./feature-access-store', () => ({
+  useFeatureAccessStore: {
+    getState: vi.fn(),
+  },
+}));
 
 describe('useRoadmapShockStore', () => {
   const mockInput: DividendGoalShockRequest = {
@@ -35,6 +41,9 @@ describe('useRoadmapShockStore', () => {
       error: null,
       isLoading: false,
     });
+    vi.mocked(useFeatureAccessStore.getState).mockReturnValue({
+      lockFeature: vi.fn(),
+    } as unknown as ReturnType<typeof useFeatureAccessStore.getState>);
   });
 
   afterEach(() => {
@@ -108,6 +117,30 @@ describe('useRoadmapShockStore', () => {
     expect(state.response).toBeNull();
     expect(state.error).toEqual(errorResponse);
     expect(state.isLoading).toBe(false);
+  });
+
+  it('403時はロック状態を設定する', async () => {
+    const errorResponse: SimulationErrorResponse = {
+      error: {
+        code: 'FORBIDDEN',
+        message: 'Access forbidden.',
+        details: null,
+      },
+    };
+
+    const lockFeature = vi.fn();
+    vi.mocked(useFeatureAccessStore.getState).mockReturnValue({
+      lockFeature,
+    } as unknown as ReturnType<typeof useFeatureAccessStore.getState>);
+
+    vi.mocked(runDividendGoalShock).mockResolvedValueOnce({
+      ok: false,
+      error: errorResponse,
+    });
+
+    await useRoadmapShockStore.getState().runShock(mockInput);
+
+    expect(lockFeature).toHaveBeenCalledWith('stress_test', 'forbidden');
   });
 
   it('sets isLoading while running', async () => {

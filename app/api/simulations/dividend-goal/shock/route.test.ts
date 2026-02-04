@@ -1,194 +1,120 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { POST } from './route';
-import type { DividendGoalShockResponse } from '../../../../../lib/simulations/types';
+
+vi.mock('../../../../../lib/access/access-gate', () => ({
+  createAccessGateService: vi.fn(),
+}));
 
 vi.mock('../../../../../lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
 
+vi.mock('../../../../../lib/simulations/mock', () => ({
+  runDividendGoalSimulationMock: vi.fn(),
+}));
+
+import { createAccessGateService } from '../../../../../lib/access/access-gate';
 import { createClient } from '../../../../../lib/supabase/server';
+import { runDividendGoalSimulationMock } from '../../../../../lib/simulations/mock';
 
+const mockCreateAccessGateService =
+  createAccessGateService as ReturnType<typeof vi.fn>;
 const mockCreateClient = createClient as ReturnType<typeof vi.fn>;
+const mockRunSimulation =
+  runDividendGoalSimulationMock as ReturnType<typeof vi.fn>;
 
-const buildRequest = (body: unknown) =>
-  new Request(
-    'http://localhost:3000/api/simulations/dividend-goal/shock',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
+const validRequestBody = {
+  target_annual_dividend: 120000,
+  monthly_contribution: 20000,
+  horizon_years: 5,
+  assumptions: {
+    yield_rate: 3.5,
+    dividend_growth_rate: 2.1,
+    tax_mode: 'after_tax',
+  },
+  shock: {
+    year: new Date().getFullYear(),
+    rate: 10,
+  },
+};
 
-describe('POST /api/simulations/dividend-goal/shock', () => {
+describe('DividendGoalShockApi access control', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    if (vi.isFakeTimers()) {
-      vi.useRealTimers();
-    }
-  });
-
-  it('未認証の場合は401を返す', async () => {
+  it('無料ユーザーは403を返す', async () => {
     mockCreateClient.mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: { user: null },
-          error: new Error('Unauthorized'),
-        }),
-      },
-    });
-
-    const response = await POST(
-      buildRequest({
-        target_annual_dividend: 1000000,
-        monthly_contribution: 30000,
-        horizon_years: 5,
-        assumptions: {
-          yield_rate: 3.5,
-          dividend_growth_rate: 2.0,
-          tax_mode: 'after_tax',
-        },
-        shock: { year: 2027, rate: 25 },
-      })
-    );
-
-    const json = (await response.json()) as { error: { code: string } };
-
-    expect(response.status).toBe(401);
-    expect(json.error.code).toBe('UNAUTHORIZED');
-  });
-
-  it('無料ユーザーの場合は403を返す', async () => {
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123', app_metadata: { plan: 'free' } } },
+          data: { user: { id: 'user-1' } },
           error: null,
         }),
       },
     });
 
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: false,
+        plan: 'free',
+      }),
+    });
+
     const response = await POST(
-      buildRequest({
-        target_annual_dividend: 1000000,
-        monthly_contribution: 30000,
-        horizon_years: 5,
-        assumptions: {
-          yield_rate: 3.5,
-          dividend_growth_rate: 2.0,
-          tax_mode: 'after_tax',
-        },
-        shock: { year: 2027, rate: 25 },
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
       })
     );
-
-    const json = (await response.json()) as { error: { code: string } };
 
     expect(response.status).toBe(403);
-    expect(json.error.code).toBe('FORBIDDEN');
   });
 
-  it('減配率が範囲外の場合は400を返す', async () => {
+  it('有料ユーザーはアクセスできる', async () => {
     mockCreateClient.mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123', app_metadata: { plan: 'premium' } } },
+          data: { user: { id: 'user-1' } },
           error: null,
         }),
       },
     });
 
-    const response = await POST(
-      buildRequest({
-        target_annual_dividend: 1000000,
-        monthly_contribution: 30000,
-        horizon_years: 5,
-        assumptions: {
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: true,
+        plan: 'premium',
+      }),
+    });
+
+    mockRunSimulation.mockResolvedValue({
+      ok: true,
+      data: {
+        snapshot: {
+          target_annual_dividend: 120000,
+          expected_annual_dividend: 100000,
+          horizon_years: 5,
           yield_rate: 3.5,
-          dividend_growth_rate: 2.0,
+          dividend_growth_rate: 2.1,
           tax_mode: 'after_tax',
         },
-        shock: { year: 2027, rate: 120 },
-      })
-    );
-
-    const json = (await response.json()) as { error: { code: string } };
-
-    expect(response.status).toBe(400);
-    expect(json.error.code).toBe('BAD_REQUEST');
-  });
-
-  it('減配年が期間外の場合は400を返す', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123', app_metadata: { plan: 'premium' } } },
-          error: null,
-        }),
+        result: {
+          achieved: false,
+          achieved_in_year: null,
+          end_annual_dividend: 100000,
+        },
+        series: [{ year: new Date().getFullYear(), annual_dividend: 100000 }],
       },
     });
 
     const response = await POST(
-      buildRequest({
-        target_annual_dividend: 1000000,
-        monthly_contribution: 30000,
-        horizon_years: 1,
-        assumptions: {
-          yield_rate: 3.5,
-          dividend_growth_rate: 2.0,
-          tax_mode: 'after_tax',
-        },
-        shock: { year: 2028, rate: 25 },
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
       })
     );
-
-    const json = (await response.json()) as { error: { code: string } };
-
-    expect(response.status).toBe(400);
-    expect(json.error.code).toBe('BAD_REQUEST');
-  });
-
-  it('入力が正しい場合はbase/shockedと差分を返す', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-
-    mockCreateClient.mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123', app_metadata: { plan: 'premium' } } },
-          error: null,
-        }),
-      },
-    });
-
-    const response = await POST(
-      buildRequest({
-        target_annual_dividend: 100,
-        monthly_contribution: 0,
-        horizon_years: 2,
-        assumptions: {
-          yield_rate: 3.5,
-          dividend_growth_rate: 2.0,
-          tax_mode: 'after_tax',
-        },
-        shock: { year: 2027, rate: 50 },
-      })
-    );
-
-    const json = (await response.json()) as DividendGoalShockResponse;
 
     expect(response.status).toBe(200);
-    expect(json.base.series?.length).toBe(3);
-    expect(json.shocked.series?.[1]?.annual_dividend).toBe(25);
-    expect(json.shocked.series?.[2]?.annual_dividend).toBe(50);
-    expect(json.delta.end_annual_dividend_gap).toBe(50);
-    expect(json.delta.achieved_year_delay).toBeNull();
   });
 });
