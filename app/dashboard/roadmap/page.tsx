@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { RoadmapChart } from '../../../components/roadmap/roadmap-chart';
 import { RoadmapForm } from '../../../components/roadmap/roadmap-form';
 import { RoadmapLevers } from '../../../components/roadmap/roadmap-levers';
+import { RoadmapShockView } from '../../../components/roadmap/roadmap-shock-view';
 import { RoadmapSummary } from '../../../components/roadmap/roadmap-summary';
 import { ScenarioCompareView } from '../../../components/roadmap/scenario-compare-view';
 import { Button } from '../../../components/ui/button';
@@ -92,6 +93,10 @@ export default function RoadmapPage() {
               配当の推移（ロードマップ）
             </h2>
             <RoadmapChart />
+          </section>
+
+          <section className="space-y-3">
+            <RoadmapShockView />
           </section>
 
           <section className="space-y-3">

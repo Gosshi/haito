@@ -70,6 +70,12 @@ describe('RoadmapPage', () => {
     expect(screen.getByText('ロードマップの前提条件')).toBeInTheDocument();
     expect(screen.getByText('ロードマップ概要')).toBeInTheDocument();
     expect(screen.getByText('配当の推移（ロードマップ）')).toBeInTheDocument();
+    expect(
+      screen.getByText('想定外が起きた場合のロードマップ')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('一時的な減配が起きた場合の影響を確認できます。')
+    ).toBeInTheDocument();
     expect(screen.getByText('効きやすいレバー（感度チェック）')).toBeInTheDocument();
     expect(
       screen.getByText(
