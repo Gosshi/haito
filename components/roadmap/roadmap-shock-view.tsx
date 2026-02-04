@@ -1,46 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { getFeatureAccess } from '../../lib/access/feature-access';
+import { useFeatureAccessStore } from '../../stores/feature-access-store';
 import { useRoadmapShockStore } from '../../stores/roadmap-shock-store';
-import { Card, CardContent } from '../ui/card';
+import { PremiumLockBanner } from '../premium/premium-lock-banner';
 import { RoadmapShockChart } from './roadmap-shock-chart';
 import { RoadmapShockForm } from './roadmap-shock-form';
 import { RoadmapShockSummary } from './roadmap-shock-summary';
 
-type AccessState = 'loading' | 'allowed' | 'locked';
-
 export function RoadmapShockView() {
-  const [accessState, setAccessState] = useState<AccessState>('loading');
   const error = useRoadmapShockStore((state) => state.error);
+  const lockState = useFeatureAccessStore(
+    (state) => state.locks.stress_test
+  );
+  const refreshStatus = useFeatureAccessStore((state) => state.refreshStatus);
 
   useEffect(() => {
-    let isMounted = true;
+    void refreshStatus();
+  }, [refreshStatus]);
 
-    const loadAccess = async () => {
-      try {
-        const access = await getFeatureAccess();
-        if (!isMounted) {
-          return;
-        }
-        setAccessState(access.stress_test ? 'allowed' : 'locked');
-      } catch {
-        if (!isMounted) {
-          return;
-        }
-        setAccessState('locked');
-      }
-    };
-
-    void loadAccess();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const errorMessage = error?.error?.message ?? null;
+  const errorMessage =
+    error?.error?.code === 'FORBIDDEN' ? null : error?.error?.message ?? null;
 
   return (
     <div className="space-y-6">
@@ -51,28 +32,9 @@ export function RoadmapShockView() {
         </p>
       </div>
 
-      {accessState === 'loading' && (
-        <Card>
-          <CardContent className="py-6">
-            <p className="text-sm text-muted-foreground">
-              利用状況を確認中です...
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {accessState === 'locked' && (
-        <Card>
-          <CardContent className="space-y-2 py-6">
-            <p className="text-sm font-medium">ストレステストは未実行です。</p>
-            <p className="text-xs text-muted-foreground">
-              有料プランで利用できます。
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {accessState === 'allowed' && (
+      {lockState.locked ? (
+        <PremiumLockBanner feature="stress_test" />
+      ) : (
         <>
           <section className="space-y-3">
             <h3 className="text-base font-semibold">ストレステスト入力</h3>

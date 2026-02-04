@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { createAccessGateService } from '../../../../../lib/access/access-gate';
 import { createClient } from '../../../../../lib/supabase/server';
 import { runDividendGoalSimulationMock } from '../../../../../lib/simulations/mock';
 import type {
@@ -118,17 +119,19 @@ const buildResponseFromSeries = (
 
   return {
     snapshot: {
-      current_annual_dividend: series[0]?.annual_dividend ?? 0,
-      current_yield_rate: input.assumptions.yield_rate,
+      target_annual_dividend: target,
+      expected_annual_dividend: endAnnualDividend ?? 0,
+      horizon_years: input.horizon_years,
+      yield_rate: input.assumptions.yield_rate,
+      dividend_growth_rate: input.assumptions.dividend_growth_rate,
+      tax_mode: input.assumptions.tax_mode,
     },
     result: {
       achieved,
       achieved_in_year: achievedPoint?.year ?? null,
       end_annual_dividend: endAnnualDividend,
-      target_annual_dividend: target,
     },
     series,
-    recommendations: [],
   };
 };
 
@@ -157,10 +160,6 @@ const buildDelta = (
   };
 };
 
-const isPremiumPlan = (plan: unknown): boolean => {
-  return plan === 'premium' || plan === 'paid' || plan === 'pro';
-};
-
 export async function POST(
   request: Request
 ): Promise<NextResponse<DividendGoalShockResponse | SimulationErrorResponse>> {
@@ -175,8 +174,9 @@ export async function POST(
     );
   }
 
-  const plan = user.app_metadata?.plan ?? user.user_metadata?.plan ?? null;
-  if (!isPremiumPlan(plan)) {
+  const accessGate = createAccessGateService();
+  const decision = await accessGate.decideAccess({ feature: 'stress_test' });
+  if (!decision.allowed) {
     return NextResponse.json(
       buildErrorResponse('FORBIDDEN', 'Access forbidden.'),
       { status: 403 }
@@ -212,9 +212,8 @@ export async function POST(
   }
 
   const base = baseResult.data;
-  const baseSeries = Array.isArray(base.series) ? base.series : [];
   const shockedSeries = applyShockToSeries(
-    baseSeries,
+    base.series ?? [],
     input.shock.year,
     input.shock.rate
   );

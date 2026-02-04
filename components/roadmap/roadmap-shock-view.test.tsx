@@ -4,15 +4,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
+import type { FeatureKey } from '../../lib/access/feature-catalog';
+import * as featureStore from '../../stores/feature-access-store';
+import * as shockStore from '../../stores/roadmap-shock-store';
 import { RoadmapShockView } from './roadmap-shock-view';
 
-const { mockGetFeatureAccess } = vi.hoisted(() => ({
-  mockGetFeatureAccess: vi.fn(),
-}));
-
-vi.mock('../../lib/access/feature-access', () => ({
-  getFeatureAccess: mockGetFeatureAccess,
-}));
+vi.mock('../../stores/feature-access-store');
+vi.mock('../../stores/roadmap-shock-store');
 
 vi.mock('./roadmap-shock-form', () => ({
   RoadmapShockForm: () => <div data-testid="roadmap-shock-form" />,
@@ -26,14 +24,58 @@ vi.mock('./roadmap-shock-chart', () => ({
   RoadmapShockChart: () => <div data-testid="roadmap-shock-chart" />,
 }));
 
+const buildLocks = (locked: boolean) =>
+  ({
+    stress_test: {
+      feature: 'stress_test',
+      locked,
+      reason: locked ? 'forbidden' : 'unknown',
+    },
+    anxiety_relief: {
+      feature: 'anxiety_relief',
+      locked: false,
+      reason: 'unknown',
+    },
+  }) satisfies Record<FeatureKey, {
+    feature: FeatureKey;
+    locked: boolean;
+    reason: 'forbidden' | 'unknown';
+  }>;
+
+const setupFeatureStore = (locked: boolean) => {
+  vi.mocked(featureStore.useFeatureAccessStore).mockImplementation((selector) => {
+    const state = {
+      status: null,
+      locks: buildLocks(locked),
+      refreshStatus: vi.fn(),
+      lockFeature: vi.fn(),
+      unlockFeature: vi.fn(),
+    };
+    return selector(state);
+  });
+};
+
+const setupShockStore = (error: { error: { code: string } } | null) => {
+  vi.mocked(shockStore.useRoadmapShockStore).mockImplementation((selector) => {
+    const state = {
+      input: null,
+      response: null,
+      error,
+      isLoading: false,
+      runShock: vi.fn(),
+    };
+    return selector(state);
+  });
+};
+
 describe('RoadmapShockView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setupFeatureStore(false);
+    setupShockStore(null);
   });
 
   it('見出しと説明文を表示する', () => {
-    mockGetFeatureAccess.mockResolvedValue({ stress_test: false });
-
     render(<RoadmapShockView />);
 
     expect(
@@ -44,25 +86,20 @@ describe('RoadmapShockView', () => {
     ).toBeInTheDocument();
   });
 
-  it('無料ユーザーの場合はロック表示を行う', async () => {
-    mockGetFeatureAccess.mockResolvedValue({ stress_test: false });
+  it('ロック状態の場合はロック表示を行う', () => {
+    setupFeatureStore(true);
 
     render(<RoadmapShockView />);
 
     expect(
-      await screen.findByText('ストレステストは未実行です。')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('有料プランで利用できます。')
+      screen.getByText('この機能は有料プランで利用できます。')
     ).toBeInTheDocument();
   });
 
-  it('有料ユーザーの場合はフォームと結果を表示する', async () => {
-    mockGetFeatureAccess.mockResolvedValue({ stress_test: true });
-
+  it('ロックされていない場合はフォームと結果を表示する', () => {
     render(<RoadmapShockView />);
 
-    expect(await screen.findByTestId('roadmap-shock-form')).toBeInTheDocument();
+    expect(screen.getByTestId('roadmap-shock-form')).toBeInTheDocument();
     expect(screen.getByTestId('roadmap-shock-summary')).toBeInTheDocument();
     expect(screen.getByTestId('roadmap-shock-chart')).toBeInTheDocument();
   });
