@@ -1,49 +1,40 @@
-export type TaxMode = 'pretax' | 'after_tax';
+export {
+  dividendGoalAssumptionsSchema,
+  dividendGoalRecommendationSchema,
+  dividendGoalRequestSchema,
+  dividendGoalResponseSchema,
+  dividendGoalResultSchema,
+  dividendGoalSeriesPointSchema,
+  dividendGoalSnapshotSchema,
+  simulationErrorSchema,
+  taxModeSchema,
+} from './dividend-goal-schema';
 
-export type DividendGoalAssumptions = {
-  yield_rate: number;
-  dividend_growth_rate: number;
-  tax_mode: TaxMode;
-};
+export type {
+  DividendGoalAssumptions,
+  DividendGoalRecommendation,
+  DividendGoalRequest,
+  DividendGoalResponse,
+  DividendGoalResult,
+  DividendGoalSeriesPoint,
+  DividendGoalSnapshot,
+  SimulationErrorResponse,
+  TaxMode,
+} from './dividend-goal-schema';
 
-export type DividendGoalRequest = {
-  target_annual_dividend: number;
-  monthly_contribution: number;
-  horizon_years: number;
-  assumptions: DividendGoalAssumptions;
-};
+import type {
+  DividendGoalAssumptions,
+  DividendGoalRequest,
+  DividendGoalResponse,
+  DividendGoalResult,
+  DividendGoalSeriesPoint,
+  SimulationErrorResponse,
+} from './dividend-goal-schema';
 
 export type DividendGoalScenarioCompareRequest = {
   target_annual_dividend: number;
   monthly_contribution: number;
   horizon_years: number;
-};
-
-export type DividendGoalSnapshot = {
-  current_annual_dividend?: number | null;
-  current_yield_rate?: number | null;
-};
-
-export type DividendGoalSeriesPoint = {
-  year: number;
-  annual_dividend: number;
-};
-
-export type DividendGoalResult = {
-  achieved?: boolean;
-  achieved_in_year?: number | null;
-  gap_now?: number | null;
-  end_annual_dividend?: number | null;
-  target_annual_dividend?: number | null;
-};
-
-export type DividendGoalRecommendation = Record<string, unknown>;
-
-export type DividendGoalResponse = {
-  snapshot?: DividendGoalSnapshot | null;
-  result?: DividendGoalResult | null;
-  series?: DividendGoalSeriesPoint[];
-  recommendations?: DividendGoalRecommendation[];
 };
 
 export type DividendGoalScenario = {
@@ -76,14 +67,6 @@ export type DividendGoalShockResponse = {
   base: DividendGoalResponse;
   shocked: DividendGoalResponse;
   delta: DividendGoalShockDelta;
-};
-
-export type SimulationErrorResponse = {
-  error: {
-    code: string;
-    message: string;
-    details: unknown | null;
-  };
 };
 
 export type SimulationResult<T> =

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { createAccessGateService } from '../../../../../lib/access/access-gate';
 import { createClient } from '../../../../../lib/supabase/server';
-import { runDividendGoalSimulationMock } from '../../../../../lib/simulations/mock';
+import { runDividendGoalSimulation } from '../../../../../lib/simulations/dividend-goal-sim';
 import type {
   DividendGoalAssumptions,
   DividendGoalResponse,
@@ -110,26 +110,25 @@ const applyShockToSeries = (
 
 const buildResponseFromSeries = (
   series: DividendGoalSeriesPoint[],
-  input: DividendGoalShockRequest
+  input: DividendGoalShockRequest,
+  base: DividendGoalResponse
 ): DividendGoalResponse => {
   const target = input.target_annual_dividend;
   const achievedPoint = series.find((point) => point.annual_dividend >= target);
   const endAnnualDividend = series.at(-1)?.annual_dividend ?? null;
-  const achieved = Boolean(achievedPoint);
+  const currentAnnualDividend =
+    typeof base.snapshot?.current_annual_dividend === 'number'
+      ? base.snapshot.current_annual_dividend
+      : 0;
 
   return {
-    snapshot: {
-      target_annual_dividend: target,
-      expected_annual_dividend: endAnnualDividend ?? 0,
-      horizon_years: input.horizon_years,
-      yield_rate: input.assumptions.yield_rate,
-      dividend_growth_rate: input.assumptions.dividend_growth_rate,
-      tax_mode: input.assumptions.tax_mode,
-    },
+    snapshot: base.snapshot ?? null,
     result: {
-      achieved,
+      achieved: Boolean(achievedPoint),
       achieved_in_year: achievedPoint?.year ?? null,
+      gap_now: Math.max(0, target - Math.max(0, currentAnnualDividend)),
       end_annual_dividend: endAnnualDividend,
+      target_annual_dividend: target,
     },
     series,
   };
@@ -202,7 +201,7 @@ export async function POST(
   }
 
   const input = validation.value;
-  const baseResult = await runDividendGoalSimulationMock(input);
+  const baseResult = await runDividendGoalSimulation(input);
 
   if (!baseResult.ok) {
     return NextResponse.json(
@@ -217,7 +216,7 @@ export async function POST(
     input.shock.year,
     input.shock.rate
   );
-  const shocked = buildResponseFromSeries(shockedSeries, input);
+  const shocked = buildResponseFromSeries(shockedSeries, input, base);
   const delta = buildDelta(base, shocked);
 
   return NextResponse.json({
