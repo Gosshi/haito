@@ -173,7 +173,7 @@ export function SimulationResults() {
           <CardContent>
             <div data-testid="simulation-series-chart">
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={seriesData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+                <LineChart data={seriesData} margin={{ top: 20, right: 20, bottom: 20, left: 24 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="year"
@@ -183,9 +183,11 @@ export function SimulationResults() {
                     axisLine={false}
                   />
                   <YAxis
+                    width={84}
                     tick={{ fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
+                    tickMargin={8}
                     tickFormatter={(value) => formatCurrency(Number(value))}
                   />
                   <Tooltip content={<CustomTooltip />} />
