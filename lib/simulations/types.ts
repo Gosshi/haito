@@ -58,6 +58,26 @@ export type DividendGoalScenarioCompareResponse = {
   scenarios: DividendGoalScenario[];
 };
 
+export type DividendGoalShock = {
+  year: number;
+  rate: number;
+};
+
+export type DividendGoalShockRequest = DividendGoalRequest & {
+  shock: DividendGoalShock;
+};
+
+export type DividendGoalShockDelta = {
+  achieved_year_delay: number | null;
+  end_annual_dividend_gap: number | null;
+};
+
+export type DividendGoalShockResponse = {
+  base: DividendGoalResponse;
+  shocked: DividendGoalResponse;
+  delta: DividendGoalShockDelta;
+};
+
 export type SimulationErrorResponse = {
   error: {
     code: string;
