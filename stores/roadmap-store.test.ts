@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { useRoadmapStore } from './roadmap-store';
+import * as historyStore from './roadmap-history-store';
 import { runRoadmapSimulation } from '../lib/simulations/roadmap';
 import type {
   DividendGoalRequest,
@@ -10,6 +11,11 @@ import type {
 } from '../lib/simulations/types';
 
 vi.mock('../lib/simulations/roadmap');
+vi.mock('./roadmap-history-store', () => ({
+  useRoadmapHistoryStore: {
+    getState: vi.fn(),
+  },
+}));
 
 describe('useRoadmapStore', () => {
   const mockInput: DividendGoalRequest = {
@@ -23,8 +29,14 @@ describe('useRoadmapStore', () => {
     },
   };
 
+  let mockSaveHistory: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSaveHistory = vi.fn().mockResolvedValue({ ok: true });
+    vi.mocked(historyStore.useRoadmapHistoryStore.getState).mockReturnValue({
+      saveHistory: mockSaveHistory,
+    } as unknown as ReturnType<typeof historyStore.useRoadmapHistoryStore.getState>);
     useRoadmapStore.setState({
       input: null,
       response: null,
@@ -86,6 +98,7 @@ describe('useRoadmapStore', () => {
     expect(state.input).toEqual(mockInput);
     expect(state.error).toEqual(errorResponse);
     expect(state.isLoading).toBe(false);
+    expect(mockSaveHistory).not.toHaveBeenCalled();
   });
 
   it('実行中はisLoadingがtrueになる', async () => {
@@ -106,5 +119,29 @@ describe('useRoadmapStore', () => {
     await runPromise;
 
     expect(useRoadmapStore.getState().isLoading).toBe(false);
+  });
+
+  it('成功時に履歴保存を実行する', async () => {
+    const mockResponse: DividendGoalResponse = {
+      snapshot: { current_annual_dividend: 120000, current_yield_rate: 3.2 },
+      result: { target_annual_dividend: 1000000 },
+      series: [{ year: 2026, annual_dividend: 180000 }],
+    };
+
+    vi.mocked(runRoadmapSimulation).mockResolvedValueOnce({
+      ok: true,
+      data: mockResponse,
+    });
+
+    await useRoadmapStore.getState().runRoadmap(mockInput);
+
+    expect(mockSaveHistory).toHaveBeenCalledWith({
+      input: mockInput,
+      summary: {
+        snapshot: mockResponse.snapshot ?? null,
+        result: mockResponse.result ?? null,
+      },
+      series: mockResponse.series ?? [],
+    });
   });
 });
