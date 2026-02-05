@@ -44,6 +44,8 @@ type SliderField =
   | 'dividendGrowthRate'
   | 'reinvestRate';
 
+type RoadmapFieldErrors = Partial<Record<SliderField, string>>;
+
 const sliderConfigs: Record<SliderField, SliderConfig> = {
   targetAnnualDividend: { min: 0, max: 5000000, step: 10000 },
   monthlyContribution: { min: 0, max: 200000, step: 1000 },
@@ -52,6 +54,19 @@ const sliderConfigs: Record<SliderField, SliderConfig> = {
   dividendGrowthRate: { min: 0, max: 10, step: 0.1 },
   reinvestRate: { min: 0, max: 1, step: 0.05 },
 };
+
+const defaultValues = {
+  targetAnnualDividend: 1000000,
+  monthlyContribution: 30000,
+  horizonYears: 10,
+  yieldRate: 3.0,
+  dividendGrowthRate: 1.0,
+  reinvestRate: 1.0,
+  accountType: 'nisa' as const,
+  taxMode: 'after_tax' as const,
+};
+
+const invalidNumberMessage = '数値で入力してください';
 
 const getCurrentYear = () => new Date().getFullYear();
 
@@ -70,6 +85,24 @@ const stringifyNumber = (value: number | null | undefined): string => {
   return String(value);
 };
 
+const getStepPrecision = (step: number): number => {
+  const stepText = String(step);
+  const decimalIndex = stepText.indexOf('.');
+  return decimalIndex === -1 ? 0 : stepText.length - decimalIndex - 1;
+};
+
+const clampToRange = (value: number, config: SliderConfig): number =>
+  Math.min(Math.max(value, config.min), config.max);
+
+const alignToStep = (value: number, config: SliderConfig): number => {
+  const clamped = clampToRange(value, config);
+  const steps = Math.round((clamped - config.min) / config.step);
+  const aligned = config.min + steps * config.step;
+  const precision = getStepPrecision(config.step);
+  const rounded = Number(aligned.toFixed(precision));
+  return clampToRange(rounded, config);
+};
+
 const resolveHorizonYears = (
   goalDeadlineYear: number | null | undefined,
   currentYear: number
@@ -79,6 +112,16 @@ const resolveHorizonYears = (
   }
   const diff = goalDeadlineYear - currentYear;
   return diff > 0 ? diff : null;
+};
+
+const resolveInitialNumber = (
+  value: number | null | undefined,
+  fallback: number,
+  config: SliderConfig
+): string => {
+  const resolved =
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return stringifyNumber(alignToStep(resolved, config));
 };
 
 const buildInitialValues = (
@@ -97,14 +140,38 @@ const buildInitialValues = (
   const yieldRate = snapshot?.current_yield_rate ?? null;
 
   return {
-    targetAnnualDividend: stringifyNumber(targetAnnualDividend),
-    monthlyContribution: '',
-    horizonYears: stringifyNumber(horizonYears),
-    yieldRate: stringifyNumber(yieldRate),
-    dividendGrowthRate: '',
-    reinvestRate: stringifyNumber(1),
-    accountType: 'nisa',
-    taxMode: 'after_tax',
+    targetAnnualDividend: resolveInitialNumber(
+      targetAnnualDividend,
+      defaultValues.targetAnnualDividend,
+      sliderConfigs.targetAnnualDividend
+    ),
+    monthlyContribution: resolveInitialNumber(
+      null,
+      defaultValues.monthlyContribution,
+      sliderConfigs.monthlyContribution
+    ),
+    horizonYears: resolveInitialNumber(
+      horizonYears,
+      defaultValues.horizonYears,
+      sliderConfigs.horizonYears
+    ),
+    yieldRate: resolveInitialNumber(
+      yieldRate,
+      defaultValues.yieldRate,
+      sliderConfigs.yieldRate
+    ),
+    dividendGrowthRate: resolveInitialNumber(
+      null,
+      defaultValues.dividendGrowthRate,
+      sliderConfigs.dividendGrowthRate
+    ),
+    reinvestRate: resolveInitialNumber(
+      defaultValues.reinvestRate,
+      defaultValues.reinvestRate,
+      sliderConfigs.reinvestRate
+    ),
+    accountType: defaultValues.accountType,
+    taxMode: defaultValues.taxMode,
   };
 };
 
@@ -113,7 +180,22 @@ const resolveSliderValue = (value: string, config: SliderConfig): number => {
   if (parsed === null) {
     return config.min;
   }
-  return Math.min(Math.max(parsed, config.min), config.max);
+  return alignToStep(parsed, config);
+};
+
+const normalizeNumberInput = (
+  value: string,
+  config: SliderConfig
+): { value: string; error: string | null } => {
+  if (value.trim() === '') {
+    return { value: '', error: invalidNumberMessage };
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return { value, error: invalidNumberMessage };
+  }
+  const aligned = alignToStep(parsed, config);
+  return { value: stringifyNumber(aligned), error: null };
 };
 
 const buildRequest = (values: RoadmapFormValues): DividendGoalRequest | null => {
@@ -162,6 +244,7 @@ export function RoadmapForm() {
     buildInitialValues(settings, snapshot, getCurrentYear())
   );
   const [isDirty, setIsDirty] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<RoadmapFieldErrors>({});
   const isPremium = billingStatus?.plan === 'premium' && billingStatus.is_active;
   const isLocked = !isPremium;
 
@@ -170,6 +253,7 @@ export function RoadmapForm() {
       return;
     }
     setValues(buildInitialValues(settings, snapshot, getCurrentYear()));
+    setFieldErrors({});
   }, [settings, snapshot, isDirty]);
 
   useEffect(() => {
@@ -182,18 +266,41 @@ export function RoadmapForm() {
     }
     setValues((prev) => ({
       ...prev,
-      reinvestRate: stringifyNumber(1),
-      accountType: 'nisa',
+      reinvestRate: stringifyNumber(defaultValues.reinvestRate),
+      accountType: defaultValues.accountType,
     }));
+    setFieldErrors((prev) => {
+      if (!prev.reinvestRate) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next.reinvestRate;
+      return next;
+    });
   }, [isLocked]);
 
   const request = useMemo(() => buildRequest(values), [values]);
-  const isReady = request !== null;
+  const isReady = request !== null && Object.keys(fieldErrors).length === 0;
 
   const handleFieldChange =
     (field: keyof RoadmapFormValues) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setIsDirty(true);
+      if (field in sliderConfigs) {
+        const config = sliderConfigs[field as SliderField];
+        const normalized = normalizeNumberInput(event.target.value, config);
+        setValues((prev) => ({ ...prev, [field]: normalized.value }));
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          if (normalized.error) {
+            next[field as SliderField] = normalized.error;
+          } else {
+            delete next[field as SliderField];
+          }
+          return next;
+        });
+        return;
+      }
       setValues((prev) => ({ ...prev, [field]: event.target.value }));
     };
 
@@ -223,10 +330,18 @@ export function RoadmapForm() {
             <Input
               id="targetAnnualDividend"
               type="number"
+              min={sliderConfigs.targetAnnualDividend.min}
+              max={sliderConfigs.targetAnnualDividend.max}
+              step={sliderConfigs.targetAnnualDividend.step}
               value={values.targetAnnualDividend}
               onChange={handleFieldChange('targetAnnualDividend')}
               placeholder="例: 1000000"
             />
+            {fieldErrors.targetAnnualDividend && (
+              <p className="text-sm text-red-600">
+                {fieldErrors.targetAnnualDividend}
+              </p>
+            )}
             <input
               aria-label="年間配当ゴールスライダー"
               type="range"
@@ -247,10 +362,18 @@ export function RoadmapForm() {
             <Input
               id="monthlyContribution"
               type="number"
+              min={sliderConfigs.monthlyContribution.min}
+              max={sliderConfigs.monthlyContribution.max}
+              step={sliderConfigs.monthlyContribution.step}
               value={values.monthlyContribution}
               onChange={handleFieldChange('monthlyContribution')}
               placeholder="例: 30000"
             />
+            {fieldErrors.monthlyContribution && (
+              <p className="text-sm text-red-600">
+                {fieldErrors.monthlyContribution}
+              </p>
+            )}
             <input
               aria-label="毎月の追加投資額スライダー"
               type="range"
@@ -271,10 +394,16 @@ export function RoadmapForm() {
             <Input
               id="horizonYears"
               type="number"
+              min={sliderConfigs.horizonYears.min}
+              max={sliderConfigs.horizonYears.max}
+              step={sliderConfigs.horizonYears.step}
               value={values.horizonYears}
               onChange={handleFieldChange('horizonYears')}
               placeholder="例: 5"
             />
+            {fieldErrors.horizonYears && (
+              <p className="text-sm text-red-600">{fieldErrors.horizonYears}</p>
+            )}
             <input
               aria-label="期間スライダー"
               type="range"
@@ -295,10 +424,16 @@ export function RoadmapForm() {
             <Input
               id="yieldRate"
               type="number"
+              min={sliderConfigs.yieldRate.min}
+              max={sliderConfigs.yieldRate.max}
+              step={sliderConfigs.yieldRate.step}
               value={values.yieldRate}
               onChange={handleFieldChange('yieldRate')}
               placeholder="例: 3.5"
             />
+            {fieldErrors.yieldRate && (
+              <p className="text-sm text-red-600">{fieldErrors.yieldRate}</p>
+            )}
             <input
               aria-label="想定利回りスライダー"
               type="range"
@@ -316,10 +451,18 @@ export function RoadmapForm() {
             <Input
               id="dividendGrowthRate"
               type="number"
+              min={sliderConfigs.dividendGrowthRate.min}
+              max={sliderConfigs.dividendGrowthRate.max}
+              step={sliderConfigs.dividendGrowthRate.step}
               value={values.dividendGrowthRate}
               onChange={handleFieldChange('dividendGrowthRate')}
               placeholder="例: 2"
             />
+            {fieldErrors.dividendGrowthRate && (
+              <p className="text-sm text-red-600">
+                {fieldErrors.dividendGrowthRate}
+              </p>
+            )}
             <input
               aria-label="想定増配率スライダー"
               type="range"
@@ -350,6 +493,11 @@ export function RoadmapForm() {
                 disabled={isLocked}
                 placeholder="例: 1.0"
               />
+              {fieldErrors.reinvestRate && (
+                <p className="text-sm text-red-600">
+                  {fieldErrors.reinvestRate}
+                </p>
+              )}
               <input
                 aria-label="再投資率スライダー"
                 type="range"

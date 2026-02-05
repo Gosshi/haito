@@ -132,6 +132,18 @@ describe('RoadmapForm', () => {
     render(<RoadmapForm />);
 
     expect(screen.getByLabelText('年間配当ゴール（円）')).toHaveValue(150000);
+    expect(screen.getByLabelText('想定利回り（%）')).toHaveValue(3);
+  });
+
+  it('設定もsnapshotもない場合は安全なデフォルトで初期化する', () => {
+    render(<RoadmapForm />);
+
+    expect(screen.getByLabelText('年間配当ゴール（円）')).toHaveValue(1000000);
+    expect(screen.getByLabelText('毎月の追加投資額（円）')).toHaveValue(30000);
+    expect(screen.getByLabelText('期間（年）')).toHaveValue(10);
+    expect(screen.getByLabelText('想定利回り（%）')).toHaveValue(3);
+    expect(screen.getByLabelText('想定増配率（%）')).toHaveValue(1);
+    expect(screen.getByLabelText('再投資率（0.0〜1.0）')).toHaveValue(1);
   });
 
   it('数値入力とスライダーが同期する', () => {
@@ -145,6 +157,41 @@ describe('RoadmapForm', () => {
 
     fireEvent.change(targetSlider, { target: { value: '1500000' } });
     expect(targetInput).toHaveValue(1500000);
+  });
+
+  it('数値入力とスライダーで同一の制約値を使う', () => {
+    render(<RoadmapForm />);
+
+    const targetInput = screen.getByLabelText('年間配当ゴール（円）');
+    const targetSlider = screen.getByLabelText('年間配当ゴールスライダー');
+
+    expect(targetInput).toHaveAttribute('min', '0');
+    expect(targetInput).toHaveAttribute('max', '5000000');
+    expect(targetInput).toHaveAttribute('step', '10000');
+    expect(targetSlider).toHaveAttribute('min', '0');
+    expect(targetSlider).toHaveAttribute('max', '5000000');
+    expect(targetSlider).toHaveAttribute('step', '10000');
+  });
+
+  it('範囲外入力はクランプして保持する', () => {
+    render(<RoadmapForm />);
+
+    const monthlyInput = screen.getByLabelText('毎月の追加投資額（円）');
+    fireEvent.change(monthlyInput, { target: { value: '9999999' } });
+
+    expect(monthlyInput).toHaveValue(200000);
+  });
+
+  it('数値として解釈できない場合はエラーを表示して送信できない', () => {
+    render(<RoadmapForm />);
+
+    const yieldInput = screen.getByLabelText('想定利回り（%）');
+    fireEvent.change(yieldInput, { target: { value: 'abc' } });
+
+    expect(screen.getByText('数値で入力してください')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'ロードマップを試算' })
+    ).toBeDisabled();
   });
 
   it('入力が揃った場合にロードマップ実行へ繋がる', () => {
@@ -215,10 +262,25 @@ describe('RoadmapForm', () => {
     ).toBeNull();
   });
 
-  it('未入力時は実行ボタンが無効になる', () => {
+  it('デフォルト値で試算が実行できる', () => {
     render(<RoadmapForm />);
 
     const submitButton = screen.getByRole('button', { name: 'ロードマップを試算' });
-    expect(submitButton).toBeDisabled();
+    expect(submitButton).not.toBeDisabled();
+
+    fireEvent.click(submitButton);
+
+    expect(mockRunRoadmap).toHaveBeenCalledWith({
+      target_annual_dividend: 1000000,
+      monthly_contribution: 30000,
+      horizon_years: 10,
+      assumptions: {
+        yield_rate: 3,
+        dividend_growth_rate: 1,
+        reinvest_rate: 1,
+        account_type: 'nisa',
+        tax_mode: 'after_tax',
+      },
+    });
   });
 });
