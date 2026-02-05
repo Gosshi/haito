@@ -3,7 +3,7 @@ import type { AccountType } from '../holdings/types';
 
 type SupportedAccountType = Extract<
   AccountType,
-  'specific' | 'nisa_growth' | 'nisa_tsumitate'
+  'specific' | 'nisa_growth' | 'nisa_tsumitate' | 'nisa_legacy'
 >;
 
 export type AccountDividendSummary = {
@@ -24,6 +24,7 @@ const SUPPORTED_ACCOUNT_TYPES: SupportedAccountType[] = [
   'specific',
   'nisa_growth',
   'nisa_tsumitate',
+  'nisa_legacy',
 ];
 
 const SPECIFIC_TAX_RATE = 0.20315;
@@ -40,6 +41,7 @@ const buildAccountTotals = (): Record<SupportedAccountType, number> => ({
   specific: 0,
   nisa_growth: 0,
   nisa_tsumitate: 0,
+  nisa_legacy: 0,
 });
 
 export const calculateDividendSummary = (
