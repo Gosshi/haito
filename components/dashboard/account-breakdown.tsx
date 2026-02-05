@@ -6,6 +6,7 @@ const accountLabels: Record<AccountDividendSummary['accountType'], string> = {
   specific: '特定口座',
   nisa_growth: 'NISA成長投資枠',
   nisa_tsumitate: 'NISAつみたて投資枠',
+  nisa_legacy: '旧NISA',
 };
 
 type AccountBreakdownProps = {

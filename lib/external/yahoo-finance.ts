@@ -63,12 +63,93 @@ const pickStockName = (
   return long ?? short;
 };
 
-const normalizeYield = (value: number | null): number | null => {
+const normalizeYield = (
+  value: number | null,
+  annualDividendRaw?: number | null,
+  priceRaw?: number | null
+): number | null => {
   if (value === null) {
     return null;
   }
 
-  return value <= 1 ? Number((value * 100).toFixed(4)) : value;
+  if (!Number.isFinite(value) || value <= 0) {
+    return value;
+  }
+
+  const yieldAsPercent = value <= 1 ? value * 100 : value;
+  const yieldAsPercentAlt = value <= 1 ? value : value;
+
+  const expectedPercent =
+    typeof annualDividendRaw === 'number' &&
+    Number.isFinite(annualDividendRaw) &&
+    annualDividendRaw > 0 &&
+    typeof priceRaw === 'number' &&
+    Number.isFinite(priceRaw) &&
+    priceRaw > 0
+      ? (annualDividendRaw / priceRaw) * 100
+      : null;
+
+  if (expectedPercent !== null && Number.isFinite(expectedPercent) && expectedPercent > 0) {
+    const diffPrimary = Math.abs(yieldAsPercent - expectedPercent);
+    const diffAlt = Math.abs(yieldAsPercentAlt - expectedPercent);
+    const picked = diffAlt <= diffPrimary ? yieldAsPercentAlt : yieldAsPercent;
+    return Number(picked.toFixed(4));
+  }
+
+  if (value <= 1 && value >= 0.2) {
+    return Number(yieldAsPercentAlt.toFixed(4));
+  }
+
+  return Number(yieldAsPercent.toFixed(4));
+};
+
+const MAX_FALLBACK_YIELD_RATE = 0.15;
+
+export const computeAnnualDividendFromYield = (
+  annualDividendRaw: number | null,
+  dividendYieldRaw: number | null,
+  priceRaw: number | null
+): number | null => {
+  if (
+    typeof annualDividendRaw === 'number' &&
+    Number.isFinite(annualDividendRaw) &&
+    annualDividendRaw > 0
+  ) {
+    return annualDividendRaw;
+  }
+
+  if (
+    dividendYieldRaw === null ||
+    !Number.isFinite(dividendYieldRaw) ||
+    dividendYieldRaw <= 0
+  ) {
+    return annualDividendRaw;
+  }
+
+  if (
+    priceRaw === null ||
+    !Number.isFinite(priceRaw) ||
+    priceRaw <= 0
+  ) {
+    return annualDividendRaw;
+  }
+
+  const normalizedYield = normalizeYield(
+    dividendYieldRaw,
+    annualDividendRaw,
+    priceRaw
+  );
+  if (normalizedYield === null || !Number.isFinite(normalizedYield)) {
+    return annualDividendRaw;
+  }
+
+  const yieldRate = normalizedYield / 100;
+  if (!Number.isFinite(yieldRate) || yieldRate > MAX_FALLBACK_YIELD_RATE) {
+    return annualDividendRaw;
+  }
+  const computed = priceRaw * yieldRate;
+
+  return Number.isFinite(computed) ? Number(computed.toFixed(4)) : annualDividendRaw;
 };
 
 const RATE_LIMIT_PATTERNS: RegExp[] = [
@@ -159,14 +240,23 @@ export class YahooFinanceProvider implements DividendProvider {
         const dividendYieldRaw =
           toNumber(result.dividendYield) ??
           toNumber(result.trailingAnnualDividendYield);
+        const priceRaw =
+          toNumber(result.regularMarketPrice) ??
+          toNumber(result.regularMarketPreviousClose);
+        const annualDividend =
+          computeAnnualDividendFromYield(annualDividendRaw, dividendYieldRaw, priceRaw);
 
         const paymentMonths = await fetchPaymentMonthsFromHistory(symbol);
 
         const snapshot: DividendSnapshot = {
           stock_code: normalizeStockCode(code),
           stock_name: pickStockName(result.shortName, result.longName),
-          annual_dividend: annualDividendRaw ?? null,
-          dividend_yield: normalizeYield(dividendYieldRaw),
+          annual_dividend: annualDividend ?? null,
+          dividend_yield: normalizeYield(
+            dividendYieldRaw,
+            annualDividendRaw ?? null,
+            priceRaw
+          ),
           ex_dividend_months: null,
           payment_months: paymentMonths,
           last_updated: new Date().toISOString(),

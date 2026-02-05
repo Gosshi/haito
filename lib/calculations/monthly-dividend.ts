@@ -11,13 +11,14 @@ const SPECIFIC_TAX_RATE = 0.20315;
 
 type SupportedAccountType = Extract<
   AccountType,
-  'specific' | 'nisa_growth' | 'nisa_tsumitate'
+  'specific' | 'nisa_growth' | 'nisa_tsumitate' | 'nisa_legacy'
 >;
 
 const SUPPORTED_ACCOUNT_TYPES: SupportedAccountType[] = [
   'specific',
   'nisa_growth',
   'nisa_tsumitate',
+  'nisa_legacy',
 ];
 
 const isSupportedAccountType = (
