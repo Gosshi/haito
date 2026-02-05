@@ -6,7 +6,9 @@ export {
   dividendGoalResponseSchema,
   dividendGoalResultSchema,
   dividendGoalSeriesPointSchema,
+  dividendGoalShockDeltaSchema,
   dividendGoalShockRequestSchema,
+  dividendGoalShockResponseSchema,
   dividendGoalShockSchema,
   dividendGoalSnapshotSchema,
   simulationErrorSchema,
@@ -21,8 +23,10 @@ export type {
   DividendGoalResponse,
   DividendGoalResult,
   DividendGoalSeriesPoint,
+  DividendGoalShockDelta,
   DividendGoalShock,
   DividendGoalShockRequest,
+  DividendGoalShockResponse,
   DividendGoalSnapshot,
   SimulationErrorResponse,
   TaxMode,
@@ -53,17 +57,6 @@ export type DividendGoalScenario = {
 
 export type DividendGoalScenarioCompareResponse = {
   scenarios: DividendGoalScenario[];
-};
-
-export type DividendGoalShockDelta = {
-  achieved_year_delay: number | null;
-  end_annual_dividend_gap: number | null;
-};
-
-export type DividendGoalShockResponse = {
-  base: DividendGoalResponse;
-  shocked: DividendGoalResponse;
-  delta: DividendGoalShockDelta;
 };
 
 export type SimulationResult<T> =

@@ -104,6 +104,9 @@ describe('POST /api/simulations/dividend-goal', () => {
 
     expect(response.status).toBe(400);
     expect(json.error.code).toBe('BAD_REQUEST');
+    expect(json.error.message).toContain('試算');
+    expect(json.error.message).toContain('前提条件');
+    expect(json.error.details).toHaveProperty('issues');
   });
 
   it('再投資率が範囲外の場合は400を返す', async () => {
@@ -211,6 +214,40 @@ describe('POST /api/simulations/dividend-goal', () => {
 
     expect(response.status).toBe(500);
     expect(json.error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('計算不正のシミュレーションエラーは400を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    mockRunSimulation.mockResolvedValue({
+      ok: false,
+      error: {
+        error: {
+          code: 'BAD_REQUEST',
+          message: '試算の前提条件が不正です。',
+          details: null,
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
+      })
+    );
+
+    const json = (await response.json()) as SimulationErrorResponse;
+
+    expect(response.status).toBe(400);
+    expect(json.error.code).toBe('BAD_REQUEST');
   });
 
   it('成功時に200と結果を返す', async () => {
