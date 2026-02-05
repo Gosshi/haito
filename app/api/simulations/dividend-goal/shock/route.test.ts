@@ -44,6 +44,26 @@ describe('DividendGoalShockApi access control', () => {
     vi.clearAllMocks();
   });
 
+  it('未認証の場合は401を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: new Error('Unauthorized'),
+        }),
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
+      })
+    );
+
+    expect(response.status).toBe(401);
+  });
+
   it('無料ユーザーは403を返す', async () => {
     mockCreateClient.mockReturnValue({
       auth: {
@@ -183,5 +203,121 @@ describe('DividendGoalShockApi access control', () => {
     );
 
     expect(response.status).toBe(400);
+  });
+
+  it('shock.year が期間外の場合は400で詳細を返す', async () => {
+    const currentYear = new Date().getFullYear();
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: true,
+        plan: 'premium',
+      }),
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validRequestBody,
+          horizon_years: 1,
+          shock: { year: currentYear + 2, rate: 10 },
+        }),
+      })
+    );
+
+    const json = (await response.json()) as {
+      error: { code: string; message: string; details: { issues?: unknown } };
+    };
+
+    expect(response.status).toBe(400);
+    expect(json.error.code).toBe('BAD_REQUEST');
+    expect(json.error.message).toContain('試算');
+    expect(json.error.message).toContain('前提条件');
+    expect(json.error.details).toHaveProperty('issues');
+  });
+
+  it('計算不正のシミュレーションエラーは400を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: true,
+        plan: 'premium',
+      }),
+    });
+
+    mockRunSimulation.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        error: {
+          code: 'BAD_REQUEST',
+          message: '試算の前提条件が不正です。',
+          details: null,
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
+      })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it('シミュレーションが失敗した場合は500を返す', async () => {
+    mockCreateClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    mockCreateAccessGateService.mockReturnValue({
+      decideAccess: vi.fn().mockResolvedValue({
+        allowed: true,
+        plan: 'premium',
+      }),
+    });
+
+    mockRunSimulation.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Simulation failed.',
+          details: null,
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('http://localhost/api/simulations/dividend-goal/shock', {
+        method: 'POST',
+        body: JSON.stringify(validRequestBody),
+      })
+    );
+
+    expect(response.status).toBe(500);
   });
 });

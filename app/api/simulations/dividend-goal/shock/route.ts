@@ -9,34 +9,69 @@ import type {
   DividendGoalShockResponse,
   SimulationErrorResponse,
 } from '../../../../../lib/simulations/types';
-import { dividendGoalShockRequestSchema } from '../../../../../lib/simulations/types';
+import {
+  dividendGoalShockRequestSchema,
+  dividendGoalShockResponseSchema,
+} from '../../../../../lib/simulations/types';
 
 const buildErrorResponse = (
   code: string,
-  message: string
+  message: string,
+  details: unknown | null = null
 ): SimulationErrorResponse => ({
   error: {
     code,
     message,
-    details: null,
+    details,
   },
 });
 
+const INVALID_INPUT_MESSAGE = '試算の前提条件が不正です。';
+
 const getCurrentYear = () => new Date().getFullYear();
+
+const toStatusCode = (code: string): number => {
+  if (code === 'UNAUTHORIZED') {
+    return 401;
+  }
+  if (code === 'FORBIDDEN') {
+    return 403;
+  }
+  if (code === 'BAD_REQUEST') {
+    return 400;
+  }
+  if (code === 'INTERNAL_ERROR') {
+    return 500;
+  }
+  return 500;
+};
 
 const validateRequest = (
   body: unknown
-): { ok: true; value: DividendGoalShockRequest } | { ok: false; message: string } => {
+):
+  | { ok: true; value: DividendGoalShockRequest }
+  | { ok: false; details: { issues: unknown[] } } => {
   const parsed = dividendGoalShockRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return { ok: false, message: 'Invalid request body.' };
+    return { ok: false, details: { issues: parsed.error.issues } };
   }
 
   const request = parsed.data;
   const currentYear = getCurrentYear();
   const maxYear = currentYear + request.horizon_years;
   if (request.shock.year < currentYear || request.shock.year > maxYear) {
-    return { ok: false, message: 'shock.year must be within the horizon.' };
+    return {
+      ok: false,
+      details: {
+        issues: [
+          {
+            code: 'custom',
+            path: ['shock', 'year'],
+            message: '前提条件として shock.year は期間内である必要があります。',
+          },
+        ],
+      },
+    };
   }
 
   return { ok: true, value: request };
@@ -70,72 +105,93 @@ const buildDelta = (
 export async function POST(
   request: Request
 ): Promise<NextResponse<DividendGoalShockResponse | SimulationErrorResponse>> {
-  const supabase = createClient();
-  const { data, error: authError } = await supabase.auth.getUser();
-  const user = authError ? null : data.user;
-
-  if (!user) {
-    return NextResponse.json(
-      buildErrorResponse('UNAUTHORIZED', 'Authentication required.'),
-      { status: 401 }
-    );
-  }
-
-  const accessGate = createAccessGateService();
-  const decision = await accessGate.decideAccess({ feature: 'stress_test' });
-  if (!decision.allowed) {
-    return NextResponse.json(
-      buildErrorResponse('FORBIDDEN', 'Access forbidden.'),
-      { status: 403 }
-    );
-  }
-
-  let body: unknown;
   try {
-    body = await request.json();
+    const supabase = createClient();
+    const { data, error: authError } = await supabase.auth.getUser();
+    const user = authError ? null : data.user;
+
+    if (!user) {
+      return NextResponse.json(
+        buildErrorResponse('UNAUTHORIZED', 'Authentication required.'),
+        { status: 401 }
+      );
+    }
+
+    const accessGate = createAccessGateService();
+    const decision = await accessGate.decideAccess({ feature: 'stress_test' });
+    if (!decision.allowed) {
+      return NextResponse.json(
+        buildErrorResponse('FORBIDDEN', 'Access forbidden.'),
+        { status: 403 }
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        buildErrorResponse('BAD_REQUEST', INVALID_INPUT_MESSAGE),
+        { status: 400 }
+      );
+    }
+
+    const validation = validateRequest(body);
+    if (!validation.ok) {
+      return NextResponse.json(
+        buildErrorResponse(
+          'BAD_REQUEST',
+          INVALID_INPUT_MESSAGE,
+          validation.details
+        ),
+        { status: 400 }
+      );
+    }
+
+    const input = validation.value;
+    const baseResult = await runDividendGoalSimulation(input);
+
+    if (!baseResult.ok) {
+      const status = toStatusCode(baseResult.error.error.code);
+      return NextResponse.json(baseResult.error, { status });
+    }
+
+    const shockedResult = await runDividendGoalSimulation(input, {
+      shock: input.shock,
+    });
+
+    if (!shockedResult.ok) {
+      const status = toStatusCode(shockedResult.error.error.code);
+      return NextResponse.json(shockedResult.error, { status });
+    }
+
+    const base = baseResult.data;
+    const { recommendations: _recommendations, ...shocked } =
+      shockedResult.data;
+    const delta = buildDelta(base, shocked);
+
+    const responsePayload = {
+      base,
+      shocked,
+      delta,
+    };
+    const responseValidation =
+      dividendGoalShockResponseSchema.safeParse(responsePayload);
+    if (!responseValidation.success) {
+      return NextResponse.json(
+        buildErrorResponse('INTERNAL_ERROR', 'Invalid simulation response.'),
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(responseValidation.data);
   } catch {
     return NextResponse.json(
-      buildErrorResponse('BAD_REQUEST', 'Invalid JSON body.'),
-      { status: 400 }
-    );
-  }
-
-  const validation = validateRequest(body);
-  if (!validation.ok) {
-    return NextResponse.json(
-      buildErrorResponse('BAD_REQUEST', validation.message),
-      { status: 400 }
-    );
-  }
-
-  const input = validation.value;
-  const baseResult = await runDividendGoalSimulation(input);
-
-  if (!baseResult.ok) {
-    return NextResponse.json(
-      buildErrorResponse('INTERNAL_ERROR', 'Simulation failed.'),
+      buildErrorResponse(
+        'INTERNAL_ERROR',
+        '試算中に予期しないエラーが発生しました。'
+      ),
       { status: 500 }
     );
   }
-
-  const shockedResult = await runDividendGoalSimulation(input, {
-    shock: input.shock,
-  });
-
-  if (!shockedResult.ok) {
-    return NextResponse.json(
-      buildErrorResponse('INTERNAL_ERROR', 'Simulation failed.'),
-      { status: 500 }
-    );
-  }
-
-  const base = baseResult.data;
-  const { recommendations: _recommendations, ...shocked } = shockedResult.data;
-  const delta = buildDelta(base, shocked);
-
-  return NextResponse.json({
-    base,
-    shocked,
-    delta,
-  });
 }

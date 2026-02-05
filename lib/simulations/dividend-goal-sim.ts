@@ -1,5 +1,10 @@
 import { calculateDividendSummary } from '../calculations/dividend';
 import { fetchDashboardData } from '../api/dashboard';
+import {
+  dividendGoalRequestSchema,
+  dividendGoalResponseSchema,
+  dividendGoalShockSchema,
+} from './types';
 import type {
   AccountType,
   DividendGoalRecommendation,
@@ -24,6 +29,8 @@ type SnapshotContext = {
 type SimulationOptions = {
   shock?: DividendGoalShock;
 };
+
+const INVALID_INPUT_MESSAGE = '試算の前提条件が不正です。';
 
 const buildErrorResponse = (
   code: string,
@@ -106,6 +113,37 @@ const buildSnapshotContext = async (
   };
 };
 
+const validateSimulationInput = (
+  input: DividendGoalRequest,
+  options?: SimulationOptions
+):
+  | { ok: true; value: DividendGoalRequest }
+  | { ok: false; details: { issues: unknown[] } } => {
+  const parsed = dividendGoalRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, details: { issues: parsed.error.issues } };
+  }
+
+  if (options?.shock) {
+    const shockParsed = dividendGoalShockSchema.safeParse(options.shock);
+    if (!shockParsed.success) {
+      return { ok: false, details: { issues: shockParsed.error.issues } };
+    }
+  }
+
+  return { ok: true, value: parsed.data };
+};
+
+const validateSimulationOutput = (
+  data: DividendGoalResponse
+): { ok: true; value: DividendGoalResponse } | { ok: false; details: { issues: unknown[] } } => {
+  const parsed = dividendGoalResponseSchema.safeParse(data);
+  if (!parsed.success) {
+    return { ok: false, details: { issues: parsed.error.issues } };
+  }
+  return { ok: true, value: parsed.data };
+};
+
 const buildSeries = (
   input: DividendGoalRequest,
   context: SnapshotContext,
@@ -173,12 +211,14 @@ const buildResult = (
   targetAnnualDividend: number,
   currentAnnualDividend: number
 ): DividendGoalResult => {
-  const target = Math.max(0, targetAnnualDividend);
+  const target = roundCurrency(Math.max(0, targetAnnualDividend));
   const achievedPoint = series.find(
     (point) => point.annual_dividend >= target
   );
   const endAnnualDividend = series.at(-1)?.annual_dividend ?? null;
-  const gapNow = Math.max(0, target - Math.max(0, currentAnnualDividend));
+  const gapNow = roundCurrency(
+    Math.max(0, target - Math.max(0, currentAnnualDividend))
+  );
 
   return {
     achieved: Boolean(achievedPoint),
@@ -285,22 +325,54 @@ export const runDividendGoalSimulation = async (
   input: DividendGoalRequest,
   options?: SimulationOptions
 ): Promise<SimulationResult<DividendGoalResponse>> => {
-  const snapshotContext = await buildSnapshotContext(input.assumptions.tax_mode);
+  const inputValidation = validateSimulationInput(input, options);
+  if (!inputValidation.ok) {
+    return {
+      ok: false,
+      error: buildErrorResponse(
+        'BAD_REQUEST',
+        INVALID_INPUT_MESSAGE,
+        inputValidation.details
+      ),
+    };
+  }
+
+  const validatedInput = inputValidation.value;
+  const snapshotContext = await buildSnapshotContext(
+    validatedInput.assumptions.tax_mode
+  );
   if (!snapshotContext.ok) {
     return snapshotContext;
   }
 
   const context = snapshotContext.data;
-  const { series, result } = simulateFromSnapshot(input, context, options);
-  const recommendations = buildRecommendations(input, context, options);
+  const { series, result } = simulateFromSnapshot(
+    validatedInput,
+    context,
+    options
+  );
+  const recommendations = buildRecommendations(validatedInput, context, options);
+
+  const response = {
+    snapshot: buildSnapshot(context),
+    result,
+    series,
+    recommendations,
+  };
+  const outputValidation = validateSimulationOutput(response);
+  if (!outputValidation.ok) {
+    return {
+      ok: false,
+      error: buildErrorResponse(
+        'BAD_REQUEST',
+        INVALID_INPUT_MESSAGE,
+        outputValidation.details
+      ),
+    };
+  }
 
   return {
     ok: true,
-    data: {
-      snapshot: buildSnapshot(context),
-      result,
-      series,
-      recommendations,
-    },
+    data: outputValidation.value,
   };
 };

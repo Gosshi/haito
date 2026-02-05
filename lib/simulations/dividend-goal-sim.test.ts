@@ -200,4 +200,98 @@ describe('runDividendGoalSimulation', () => {
 
     expect(result.error.error.code).toBe('UNAUTHORIZED');
   });
+
+  it('reinvest_rateが0でも例外なくseriesを返す', async () => {
+    const currentYear = new Date().getFullYear();
+    mockFetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { holdings: [], missingDividendCodes: [] },
+    });
+    mockCalculateDividendSummary.mockReturnValue(
+      buildDividendSummary({
+        totalPreTax: 100000,
+        totalAfterTax: 100000,
+        totalInvestment: 1000000,
+      })
+    );
+
+    const result = await runDividendGoalSimulation({
+      ...baseInput,
+      horizon_years: 1,
+      assumptions: {
+        ...baseInput.assumptions,
+        yield_rate: 10,
+        dividend_growth_rate: 0,
+        reinvest_rate: 0,
+        account_type: 'nisa',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.data.series).toEqual([
+      { year: currentYear, annual_dividend: 100000 },
+      { year: currentYear + 1, annual_dividend: 100000 },
+    ]);
+  });
+
+  it('金額系の出力は整数円になる', async () => {
+    mockFetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { holdings: [], missingDividendCodes: [] },
+    });
+    mockCalculateDividendSummary.mockReturnValue(
+      buildDividendSummary({
+        totalPreTax: 100000,
+        totalAfterTax: 100000,
+        totalInvestment: 1000000,
+      })
+    );
+
+    const result = await runDividendGoalSimulation({
+      ...baseInput,
+      target_annual_dividend: 100000.4,
+      assumptions: {
+        ...baseInput.assumptions,
+        yield_rate: 3.5,
+        dividend_growth_rate: 0,
+        reinvest_rate: 1,
+        account_type: 'nisa',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const { result: summary, snapshot, series } = result.data;
+    expect(Number.isInteger(summary?.gap_now ?? 0)).toBe(true);
+    expect(Number.isInteger(summary?.end_annual_dividend ?? 0)).toBe(true);
+    expect(Number.isInteger(summary?.target_annual_dividend ?? 0)).toBe(true);
+    expect(Number.isInteger(snapshot?.current_annual_dividend ?? 0)).toBe(true);
+    expect(series?.every((point) => Number.isInteger(point.annual_dividend))).toBe(
+      true
+    );
+  });
+
+  it('NaNが入力に含まれる場合はBAD_REQUESTを返す', async () => {
+    mockFetchDashboardData.mockResolvedValue({
+      ok: true,
+      data: { holdings: [], missingDividendCodes: [] },
+    });
+    mockCalculateDividendSummary.mockReturnValue(buildDividendSummary());
+
+    const result = await runDividendGoalSimulation({
+      ...baseInput,
+      assumptions: {
+        ...baseInput.assumptions,
+        yield_rate: Number.NaN,
+      },
+    } as DividendGoalRequest);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.error.error.code).toBe('BAD_REQUEST');
+  });
 });
