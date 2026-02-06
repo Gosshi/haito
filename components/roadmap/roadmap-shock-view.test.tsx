@@ -91,9 +91,7 @@ describe('RoadmapShockView', () => {
 
     render(<RoadmapShockView />);
 
-    expect(
-      screen.getByText('この機能は有料プランで利用できます。')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Proで利用できます')).toBeInTheDocument();
   });
 
   it('ロックされていない場合はフォームと結果を表示する', () => {

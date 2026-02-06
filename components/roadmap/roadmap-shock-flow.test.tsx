@@ -90,9 +90,8 @@ describe('RoadmapShockView flow', () => {
       await useRoadmapShockStore.getState().runShock(mockInput);
     });
 
-    expect(
-      screen.getByText('この機能は有料プランで利用できます。')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Proで利用できます')).toBeInTheDocument();
+    expect(screen.queryByText('Access forbidden.')).toBeNull();
     expect(screen.queryByText('ストレステスト入力')).toBeNull();
 
     await act(async () => {

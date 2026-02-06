@@ -7,6 +7,7 @@ import type {
   DividendGoalShockResponse,
   SimulationErrorResponse,
 } from '../lib/simulations/types';
+import { applyForbiddenTransition } from '../lib/access/forbidden-transition-policy';
 import { runDividendGoalShock } from '../lib/api/simulations';
 import { useFeatureAccessStore } from './feature-access-store';
 
@@ -41,7 +42,7 @@ export const useRoadmapShockStore = create<RoadmapShockState>((set) => ({
   isLoading: false,
   runShock: async (input) => {
     const requestId = (latestRequestId += 1);
-    set({ input, isLoading: true, error: null, response: null });
+    set({ input, isLoading: true, error: null });
 
     const result = await runDividendGoalShock(input);
 
@@ -50,12 +51,22 @@ export const useRoadmapShockStore = create<RoadmapShockState>((set) => ({
     }
 
     if (!result.ok) {
-      if (result.error.error.code === 'FORBIDDEN') {
-        useFeatureAccessStore
-          .getState()
-          .lockFeature('stress_test', 'forbidden');
+      const transition = applyForbiddenTransition({
+        feature: 'stress_test',
+        error: result.error,
+      });
+
+      if (transition.lock) {
+        useFeatureAccessStore.getState().lockFeature(
+          transition.lock.feature,
+          transition.lock.reason
+        );
       }
-      set({ error: result.error, response: null, isLoading: false });
+      set((state) => ({
+        error: result.error,
+        response: transition.preserveView ? state.response : null,
+        isLoading: false,
+      }));
       return;
     }
 

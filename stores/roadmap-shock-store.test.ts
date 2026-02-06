@@ -18,6 +18,7 @@ vi.mock('./feature-access-store', () => ({
 }));
 
 describe('useRoadmapShockStore', () => {
+  let mockLockFeature: ReturnType<typeof vi.fn>;
   const mockInput: DividendGoalShockRequest = {
     target_annual_dividend: 1000000,
     monthly_contribution: 30000,
@@ -35,6 +36,7 @@ describe('useRoadmapShockStore', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLockFeature = vi.fn();
     useRoadmapShockStore.setState({
       input: null,
       response: null,
@@ -42,7 +44,7 @@ describe('useRoadmapShockStore', () => {
       isLoading: false,
     });
     vi.mocked(useFeatureAccessStore.getState).mockReturnValue({
-      lockFeature: vi.fn(),
+      lockFeature: mockLockFeature,
     } as unknown as ReturnType<typeof useFeatureAccessStore.getState>);
   });
 
@@ -83,25 +85,27 @@ describe('useRoadmapShockStore', () => {
     expect(state.isLoading).toBe(false);
   });
 
-  it('clears response and updates error on failure', async () => {
+  it('FORBIDDEN以外のエラー時は既存レスポンスを保持してerrorを更新する', async () => {
     const errorResponse: SimulationErrorResponse = {
       error: {
-        code: 'FORBIDDEN',
-        message: 'Access forbidden.',
+        code: 'BAD_REQUEST',
+        message: 'Invalid input.',
         details: null,
+      },
+    };
+
+    const previousResponse: DividendGoalShockResponse = {
+      base: { result: { achieved: false }, series: [] },
+      shocked: { result: { achieved: false }, series: [] },
+      delta: {
+        achieved_year_delay: null,
+        end_annual_dividend_gap: null,
       },
     };
 
     useRoadmapShockStore.setState({
       input: mockInput,
-      response: {
-        base: { result: {}, series: [] },
-        shocked: { result: {}, series: [] },
-        delta: {
-          achieved_year_delay: null,
-          end_annual_dividend_gap: null,
-        },
-      },
+      response: previousResponse,
       error: null,
       isLoading: false,
     });
@@ -114,9 +118,10 @@ describe('useRoadmapShockStore', () => {
     await useRoadmapShockStore.getState().runShock(mockInput);
 
     const state = useRoadmapShockStore.getState();
-    expect(state.response).toBeNull();
+    expect(state.response).toEqual(previousResponse);
     expect(state.error).toEqual(errorResponse);
     expect(state.isLoading).toBe(false);
+    expect(mockLockFeature).not.toHaveBeenCalled();
   });
 
   it('403時はロック状態を設定する', async () => {

@@ -17,6 +17,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { PremiumLockBanner } from '../premium/premium-lock-banner';
 import { Select, SelectItem } from '../ui/select';
 
 type RoadmapFormValues = {
@@ -528,9 +529,7 @@ export function RoadmapForm() {
             </div>
 
             {isLocked && (
-              <p className="text-xs text-muted-foreground">
-                Freeでは再投資は100%・税区分はNISA固定で試算します
-              </p>
+              <PremiumLockBanner contextLabel="再投資率・税区分の調整" />
             )}
 
             <p className="text-xs text-muted-foreground">
