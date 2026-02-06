@@ -11,6 +11,7 @@ import { RoadmapSummary } from '../../../components/roadmap/roadmap-summary';
 import { ScenarioCompareView } from '../../../components/roadmap/scenario-compare-view';
 import { Button } from '../../../components/ui/button';
 import { Toaster } from '../../../components/ui/toaster';
+import { LegalFooter } from '../../../components/legal/legal-footer';
 import { useSettingsStore } from '../../../stores/settings-store';
 import { useRoadmapStore } from '../../../stores/roadmap-store';
 import { useScenarioCompareStore } from '../../../stores/scenario-compare-store';
@@ -106,14 +107,11 @@ export default function RoadmapPage() {
             </h2>
             <RoadmapLevers />
           </section>
-
-          <p className="text-xs text-muted-foreground">
-            入力した条件に基づく試算です。特定の投資商品を勧めるものではありません。
-          </p>
         </>
       ) : (
         <ScenarioCompareView />
       )}
+      <LegalFooter />
       <Toaster />
     </main>
   );

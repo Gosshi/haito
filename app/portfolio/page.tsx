@@ -1,5 +1,6 @@
 import { HoldingsTable } from '../../components/portfolio/holdings-table';
 import { Toaster } from '../../components/ui/toaster';
+import { LegalFooter } from '../../components/legal/legal-footer';
 
 export default function PortfolioPage() {
   return (
@@ -11,6 +12,7 @@ export default function PortfolioPage() {
         </p>
       </div>
       <HoldingsTable />
+      <LegalFooter />
       <Toaster />
     </main>
   );

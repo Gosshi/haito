@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { SimulationForm } from '../../../components/simulations/simulation-form';
 import { SimulationResults } from '../../../components/simulations/simulation-results';
+import { LegalFooter } from '../../../components/legal/legal-footer';
 import { useSettingsStore } from '../../../stores/settings-store';
 import { useSimulationStore } from '../../../stores/simulation-store';
 
@@ -48,6 +49,7 @@ export default function DividendGoalSimulationPage() {
 
       <SimulationForm />
       <SimulationResults />
+      <LegalFooter />
     </main>
   );
 }

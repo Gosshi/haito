@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { GoalForm } from '../../components/settings/goal-form';
 import { Toaster } from '../../components/ui/toaster';
+import { LegalFooter } from '../../components/legal/legal-footer';
 import { useSettingsStore } from '../../stores/settings-store';
 
 export default function SettingsPage() {
@@ -27,6 +28,7 @@ export default function SettingsPage() {
         </Link>
       </div>
       <GoalForm />
+      <LegalFooter />
       <Toaster />
     </main>
   );
