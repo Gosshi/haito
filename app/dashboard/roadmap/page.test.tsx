@@ -79,7 +79,7 @@ describe('RoadmapPage', () => {
     expect(screen.getByText('効きやすいレバー（感度チェック）')).toBeInTheDocument();
     expect(
       screen.getByText(
-        '入力した条件に基づく試算です。特定の投資商品を勧めるものではありません。'
+        '本サービスは投資助言を目的としたものではありません。表示内容は試算や前提条件に基づくもので、最終判断はご自身で行ってください。'
       )
     ).toBeInTheDocument();
   });

@@ -203,9 +203,16 @@ describe('SimulationForm', () => {
 
     expect(screen.getByLabelText('再投資率（0.0〜1.0）')).toBeDisabled();
     expect(screen.getByLabelText('税区分（NISA/課税）')).toBeDisabled();
+    expect(screen.getByText('Proで利用できます')).toBeInTheDocument();
     expect(
-      screen.getByText('Freeでは再投資は100%・税区分はNISA固定で試算します')
+      screen.getByText(
+        'より現実に近い試算（再投資率・税区分の調整）や、想定外（減配）の影響確認ができます。'
+      )
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('入力前提に基づく試算であり、投資助言ではありません。')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'プランの違いを見る' })).toBeInTheDocument();
   });
 
   it('有料プランでは再投資率と税区分を変更できる', () => {
@@ -215,8 +222,6 @@ describe('SimulationForm', () => {
 
     expect(screen.getByLabelText('再投資率（0.0〜1.0）')).not.toBeDisabled();
     expect(screen.getByLabelText('税区分（NISA/課税）')).not.toBeDisabled();
-    expect(
-      screen.queryByText('Freeでは再投資は100%・税区分はNISA固定で試算します')
-    ).toBeNull();
+    expect(screen.queryByText('Proで利用できます')).toBeNull();
   });
 });
