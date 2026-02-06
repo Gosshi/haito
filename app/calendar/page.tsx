@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { DividendBarChart } from '../../components/calendar/dividend-bar-chart';
 import { MonthlyCalendar } from '../../components/calendar/monthly-calendar';
 import { UnknownMonthSection } from '../../components/calendar/unknown-month-section';
+import { LegalFooter } from '../../components/legal/legal-footer';
 import { fetchCalendarData } from '../../lib/api/calendar';
 import { calculateMonthlyDividends } from '../../lib/calculations/monthly-dividend';
 
@@ -39,6 +40,7 @@ export default async function CalendarPage() {
         <Link className="text-sm text-primary hover:underline" href="/dashboard">
           ダッシュボードへ戻る
         </Link>
+        <LegalFooter />
       </main>
     );
   }
@@ -61,6 +63,7 @@ export default async function CalendarPage() {
         <Link className="text-sm text-primary hover:underline" href="/dashboard">
           ダッシュボードへ戻る
         </Link>
+        <LegalFooter />
       </main>
     );
   }
@@ -91,6 +94,7 @@ export default async function CalendarPage() {
           total={dividendResult.unknownMonthTotal}
         />
       )}
+      <LegalFooter />
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { RoadmapHistoryDetail } from '../../lib/roadmap-history/types';
 import { useRoadmapHistoryStore } from '../../stores/roadmap-history-store';
+import { LegalFooter } from '../legal/legal-footer';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { RoadmapHistoryCompare } from './roadmap-history-compare';
@@ -118,6 +119,7 @@ export function RoadmapHistoryPage() {
       </div>
 
       <RoadmapHistoryCompare />
+      <LegalFooter />
     </main>
   );
 }

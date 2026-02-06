@@ -4,6 +4,7 @@ import { LogoutButton } from '../../components/auth/logout-button';
 import { AccountBreakdown } from '../../components/dashboard/account-breakdown';
 import { GoalProgressWidget } from '../../components/dashboard/goal-progress-widget';
 import { SummaryCard } from '../../components/dashboard/summary-card';
+import { LegalFooter } from '../../components/legal/legal-footer';
 import { fetchDashboardData } from '../../lib/api/dashboard';
 import { calculateDividendSummary } from '../../lib/calculations/dividend';
 
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
           データの取得に失敗しました。
         </div>
         <LogoutButton />
+        <LegalFooter />
       </main>
     );
   }
@@ -73,6 +75,7 @@ export default async function DashboardPage() {
         </>
       )}
       <LogoutButton />
+      <LegalFooter />
     </main>
   );
 }
