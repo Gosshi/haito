@@ -1,6 +1,8 @@
 'use client';
 
 import type { DividendGoalRecommendation } from '../../lib/simulations/types';
+import { formatCurrencyJPY } from '../../lib/dashboard/format';
+import { formatPercent } from '../../lib/portfolio/format';
 import { useRoadmapStore } from '../../stores/roadmap-store';
 import { Card, CardContent } from '../ui/card';
 
@@ -28,6 +30,34 @@ const getTextValue = (value: unknown): string | null => {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const formatSignedCurrency = (value: number): string => {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${formatCurrencyJPY(Math.abs(value))}`;
+};
+
+const formatSignedPercent = (value: number): string => {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${formatPercent(Math.abs(value))}`;
+};
+
+const formatDeltaValue = (delta: unknown): string | null => {
+  if (!isRecord(delta)) {
+    return null;
+  }
+
+  const monthlyContribution = delta.monthly_contribution;
+  if (typeof monthlyContribution === 'number' && Number.isFinite(monthlyContribution)) {
+    return formatSignedCurrency(monthlyContribution);
+  }
+
+  const yieldRate = delta.yield_rate;
+  if (typeof yieldRate === 'number' && Number.isFinite(yieldRate)) {
+    return formatSignedPercent(yieldRate);
+  }
+
+  return null;
 };
 
 const getRecommendationView = (
@@ -64,6 +94,9 @@ export function RoadmapLevers() {
   return (
     <Card>
       <CardContent className="py-6">
+        <p className="text-xs text-muted-foreground">
+          感度チェックは前提条件を変えた試算差分です。
+        </p>
         {isLoading && (
           <p className="text-sm text-muted-foreground">計算中...</p>
         )}
@@ -76,6 +109,9 @@ export function RoadmapLevers() {
           <div className="space-y-3">
             {items.map((recommendation, index) => {
               const view = getRecommendationView(recommendation);
+              const deltaValue = formatDeltaValue(
+                isRecord(recommendation) ? recommendation.delta : null
+              );
               return (
                 <div
                   key={`roadmap-recommendation-${index}`}
@@ -85,6 +121,11 @@ export function RoadmapLevers() {
                   <p className="text-sm font-medium">レバー {index + 1}</p>
                   {view.title && (
                     <p className="mt-2 text-sm font-medium">{view.title}</p>
+                  )}
+                  {deltaValue && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      差分: {deltaValue}
+                    </p>
                   )}
                   {view.message && (
                     <p className="mt-1 text-xs text-muted-foreground">

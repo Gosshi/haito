@@ -99,7 +99,7 @@ describe('RoadmapPage integration', () => {
     render(<RoadmapPage />);
 
     fillRequiredInputs();
-    fireEvent.change(screen.getByLabelText('税区分'), {
+    fireEvent.change(screen.getByLabelText(/税区分/), {
       target: { value: 'after_tax' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'ロードマップを試算' }));
@@ -125,11 +125,53 @@ describe('RoadmapPage integration', () => {
     render(<RoadmapPage />);
 
     fillRequiredInputs();
-    fireEvent.change(screen.getByLabelText('税区分'), {
+    fireEvent.change(screen.getByLabelText(/税区分/), {
       target: { value: 'after_tax' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'ロードマップを試算' }));
 
     expect(await screen.findByText('Invalid input')).toBeInTheDocument();
+  });
+
+  it('エラー後も入力を保持して再試算できる', async () => {
+    const successResponse: DividendGoalResponse = {
+      snapshot: { current_annual_dividend: 180000, current_yield_rate: 3.2 },
+      result: {
+        target_annual_dividend: 1000000,
+        achieved_in_year: 2030,
+        end_annual_dividend: 1300000,
+      },
+      series: [
+        { year: 2026, annual_dividend: 180000 },
+        { year: 2027, annual_dividend: 240000 },
+      ],
+      recommendations: [{ title: '調整A', delta: '+1%' }],
+    };
+
+    vi.mocked(roadmapSimulation.runRoadmapSimulation)
+      .mockResolvedValueOnce({
+        ok: false,
+        error: {
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Invalid input',
+            details: null,
+          },
+        },
+      })
+      .mockResolvedValueOnce({ ok: true, data: successResponse });
+
+    render(<RoadmapPage />);
+
+    fillRequiredInputs();
+    fireEvent.click(screen.getByRole('button', { name: 'ロードマップを試算' }));
+
+    expect(await screen.findByText('Invalid input')).toBeInTheDocument();
+    expect(screen.getByLabelText('年間配当ゴール（円）')).toHaveValue(1000000);
+
+    fireEvent.click(screen.getByRole('button', { name: 'ロードマップを試算' }));
+
+    expect(await screen.findByText('配当ゴール')).toBeInTheDocument();
+    expect(screen.getByText('¥1,000,000')).toBeInTheDocument();
   });
 });

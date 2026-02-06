@@ -54,7 +54,7 @@ describe('RoadmapSummary', () => {
 
     expect(screen.getByText('現在の年間配当')).toBeInTheDocument();
     expect(screen.getByText('¥180,000')).toBeInTheDocument();
-    expect(screen.getByText('現状利回り: 3.2%')).toBeInTheDocument();
+    expect(screen.getByText('現状利回り: 3.20%')).toBeInTheDocument();
     expect(screen.getByText('配当ゴール')).toBeInTheDocument();
     expect(screen.getByText('¥1,200,000')).toBeInTheDocument();
     expect(screen.getByText('ゴール到達までの年数')).toBeInTheDocument();
@@ -80,6 +80,61 @@ describe('RoadmapSummary', () => {
     expect(screen.getByText('未達')).toBeInTheDocument();
   });
 
+  it('達成年が算出できない場合は未達を表示する', () => {
+    const response: DividendGoalResponse = {
+      result: {
+        achieved: true,
+        achieved_in_year: null,
+        target_annual_dividend: 1200000,
+      },
+    };
+
+    setupStore(response, false);
+
+    render(<RoadmapSummary />);
+
+    expect(screen.getByText('ゴール到達までの年数')).toBeInTheDocument();
+    expect(screen.getByText('未達')).toBeInTheDocument();
+  });
+
+  it('KPIの表示順を固定する', () => {
+    const response: DividendGoalResponse = {
+      snapshot: { current_annual_dividend: 180000, current_yield_rate: 3.2 },
+      result: {
+        target_annual_dividend: 1200000,
+        achieved_in_year: 2030,
+        end_annual_dividend: 1500000,
+      },
+    };
+
+    setupStore(response, false);
+
+    render(<RoadmapSummary />);
+
+    const labels = screen.getAllByTestId('roadmap-kpi-label');
+    expect(labels.map((label) => label.textContent)).toEqual([
+      '現在の年間配当',
+      '配当ゴール',
+      'ゴール到達までの年数',
+      '最終年の年間配当（試算）',
+    ]);
+  });
+
+  it('ロード中でもKPIの並びを維持して表示する', () => {
+    setupStore(null, true);
+
+    render(<RoadmapSummary />);
+
+    const labels = screen.getAllByTestId('roadmap-kpi-label');
+    expect(labels.map((label) => label.textContent)).toEqual([
+      '現在の年間配当',
+      '配当ゴール',
+      'ゴール到達までの年数',
+      '最終年の年間配当（試算）',
+    ]);
+    expect(screen.getAllByText('計算中...')).toHaveLength(4);
+  });
+
   it('結果がない場合はプレースホルダーを表示する', () => {
     render(<RoadmapSummary />);
 
@@ -93,6 +148,6 @@ describe('RoadmapSummary', () => {
 
     render(<RoadmapSummary />);
 
-    expect(screen.getByText('計算中...')).toBeInTheDocument();
+    expect(screen.getAllByText('計算中...')).toHaveLength(4);
   });
 });

@@ -93,6 +93,12 @@ describe('RoadmapForm', () => {
     ).toBeInTheDocument();
   });
 
+  it('前提条件と試算のヘルプ文を表示する', () => {
+    render(<RoadmapForm />);
+
+    expect(screen.getByText(/前提条件.*試算/)).toBeInTheDocument();
+  });
+
   it('user_settingsとsnapshotから初期値を反映する', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));

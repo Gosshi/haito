@@ -48,6 +48,36 @@ describe('RoadmapLevers', () => {
     expect(cards[1]).toHaveTextContent('調整B');
   });
 
+  it('感度チェックの説明文を表示する', () => {
+    const response: DividendGoalResponse = {
+      recommendations: [{ title: '調整A', delta: '+1.0%' }],
+    };
+
+    setupStore(response, false);
+
+    render(<RoadmapLevers />);
+
+    expect(
+      screen.getByText('感度チェックは前提条件を変えた試算差分です。')
+    ).toBeInTheDocument();
+  });
+
+  it('レバーの差分を単位付きで表示する', () => {
+    const response: DividendGoalResponse = {
+      recommendations: [
+        { title: '調整A', delta: { monthly_contribution: 10000 } },
+        { title: '調整B', delta: { yield_rate: 0.5 } },
+      ],
+    };
+
+    setupStore(response, false);
+
+    render(<RoadmapLevers />);
+
+    expect(screen.getByText('差分: +¥10,000')).toBeInTheDocument();
+    expect(screen.getByText('差分: +0.50%')).toBeInTheDocument();
+  });
+
   it('recommendationsがない場合はプレースホルダーを表示する', () => {
     render(<RoadmapLevers />);
 

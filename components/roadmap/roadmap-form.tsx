@@ -324,6 +324,9 @@ export function RoadmapForm() {
               現在の年間配当: {formatCurrencyJPY(currentAnnualDividend)}
             </p>
           )}
+          <p className="text-xs text-muted-foreground">
+            前提条件に基づく試算です。入力はあとで変更できます。
+          </p>
 
           <div className="space-y-2">
             <Label htmlFor="targetAnnualDividend">年間配当ゴール（円）</Label>

@@ -36,7 +36,7 @@ export default function RoadmapPage() {
   const isUnauthorized = error?.error?.code === 'UNAUTHORIZED';
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold">配当ロードマップ</h1>
       </div>
