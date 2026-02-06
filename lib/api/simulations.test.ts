@@ -98,6 +98,28 @@ describe('runDividendGoalSimulation', () => {
     });
   });
 
+  it('403時はFORBIDDENとして扱う', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: () => Promise.reject(new Error('invalid json')),
+    } as Response);
+
+    const result = await runDividendGoalSimulation(mockRequest);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access forbidden.',
+          details: null,
+        },
+      },
+    });
+  });
+
   it('ネットワークエラー時はNETWORK_ERRORとして扱う', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network down'));
 
@@ -208,6 +230,28 @@ describe('runDividendGoalScenarioCompare', () => {
         error: {
           code: 'UNAUTHORIZED',
           message: 'Authentication required.',
+          details: null,
+        },
+      },
+    });
+  });
+
+  it('403時はFORBIDDENとして扱う', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      json: () => Promise.reject(new Error('invalid json')),
+    } as Response);
+
+    const result = await runDividendGoalScenarioCompare(mockRequest);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access forbidden.',
           details: null,
         },
       },

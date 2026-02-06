@@ -91,6 +91,7 @@ describe('RoadmapShockView flow', () => {
     });
 
     expect(screen.getByText('Proで利用できます')).toBeInTheDocument();
+    expect(screen.queryByText('Access forbidden.')).toBeNull();
     expect(screen.queryByText('ストレステスト入力')).toBeNull();
 
     await act(async () => {
